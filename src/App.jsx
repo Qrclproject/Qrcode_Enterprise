@@ -12,6 +12,7 @@ import SentHistoryPage from './pages/SentHistoryPage';
 import TemplatesPage from './pages/TemplatesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
+import DataDeletionPage from './pages/DataDeletionPage';
 import DesignsPage from './pages/DesignsPage';
 import SpreadsheetEditorPage from './pages/SpreadsheetEditorPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 <Route path="/privacy" element={<PrivacyPolicyPage />} />
+<Route path="/data-deletion" element={<DataDeletionPage />} />
 <Route path="/terms" element={<TermsOfServicePage />} />
             {/* App pages – with sidebar/header, protected */}
             <Route
