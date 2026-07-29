@@ -14,7 +14,6 @@
     "@vitejs/plugin-legacy": "^8.2.1",
     "axios": "^1.18.1",
     "chart.js": "^4.5.1",
-    "ckeditor4-react": "^5.2.1",
     "lucide-react": "^1.25.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",

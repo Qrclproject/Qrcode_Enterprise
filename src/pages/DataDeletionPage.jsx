@@ -58,4 +58,8 @@ export default function DataDeletionPage() {
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> b065e9333655d6ff337cd332185d3410bd40496d
