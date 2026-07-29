@@ -13,6 +13,7 @@ import TemplatesPage from './pages/TemplatesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 import DesignsPage from './pages/DesignsPage';
+import DataDeletionPage from './pages/DataDeletionPage';
 import SpreadsheetEditorPage from './pages/SpreadsheetEditorPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
 <Route path="/privacy" element={<PrivacyPolicyPage />} />
 <Route path="/terms" element={<TermsOfServicePage />} />
+            <Route path="/data-deletion" element={<DataDeletionPage />} />
             {/* App pages – with sidebar/header, protected */}
             <Route
               path="/*"
