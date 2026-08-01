@@ -3,7 +3,7 @@ import { categoryColor, categoryIcon, categoryEmoji } from '../../utils/constant
 export default function TemplateCard({ template, onEdit, onClone, onDelete, selected, onSelect }) {
   const variantCount = template.variants?.length || 1;
   const activeCount = template.variants?.filter(v => v.active).length || 1;
-  const templateId = template._id || template.id;   // support both backend and legacy data
+  const templateId = template._id || template.id;
 
   return (
     <div className="relative bg-white rounded-xl border border-gray-200 p-4 template-card flex flex-col">
@@ -36,7 +36,15 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
         </div>
       </div>
 
+      {/* Internal name */}
       <h3 className="font-bold text-gray-800">{template.name}</h3>
+
+      {/* WhatsApp template name (if present) */}
+      {template.whatsappTemplateName && (
+        <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+          <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">WhatsApp: {template.whatsappTemplateName}</span>
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-1 mt-1.5">
         {template.variants?.map(v => (

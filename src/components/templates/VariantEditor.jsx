@@ -8,6 +8,8 @@ export default function VariantEditor({
   onSave,
   onCancel,
   templateId,
+  templateName,           // 👈 new prop
+  whatsappTemplateName,   // 👈 new prop
   showToast,
 }) {
   const [variants, setVariants] = useState(initialVariants || []);
@@ -70,6 +72,29 @@ export default function VariantEditor({
 
   return (
     <div className="space-y-4">
+      {/* ─── Header: show both template names ─── */}
+      <div className="border-b border-gray-200 pb-3 mb-2">
+        <h2 className="text-lg font-bold text-gray-800">{templateName}</h2>
+        {whatsappTemplateName && (
+          <p className="text-xs text-gray-500 mt-0.5">
+            WhatsApp template: <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">{whatsappTemplateName}</span>
+          </p>
+        )}
+      </div>
+
+      {/* Placeholder guidelines */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+        <p className="font-semibold">📌 Placeholder guidelines</p>
+        <ul className="list-disc list-inside mt-1 space-y-0.5 text-blue-600">
+          <li>
+            Use <code className="bg-blue-100 px-1 rounded">{'{{1}}'}</code>,{' '}
+            <code className="bg-blue-100 px-1 rounded">{'{{2}}'}</code>, … for dynamic content.
+          </li>
+          <li>The number of placeholders must match your Meta WhatsApp template.</li>
+          <li>In the Campaign Builder, you will map columns to these numbers.</li>
+        </ul>
+      </div>
+
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-700">📝 Message Variants</h3>
         <button
@@ -130,7 +155,7 @@ export default function VariantEditor({
             />
           </div>
 
-          {/* Message body container (without custom toolbar) */}
+          {/* Message body container */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-[10px] text-gray-500 font-semibold">Message Body</label>

@@ -75,7 +75,7 @@ export default function TemplatesPage() {
     }
   };
 
-  // 👇 UPDATED: Create or update template with whatsappTemplateName
+  // Create or update template with whatsappTemplateName
   const handleFormSave = async ({ name, whatsappTemplateName, category, showQR }) => {
     try {
       if (selectedTemplate) {
@@ -271,7 +271,7 @@ export default function TemplatesPage() {
         initialData={selectedTemplate}
       />
 
-      {/* Variant Editor Modal */}
+      {/* Variant Editor Modal – now passes templateName and whatsappTemplateName */}
       <Modal
         isOpen={showVariantEditor}
         onClose={() => setShowVariantEditor(false)}
@@ -284,6 +284,8 @@ export default function TemplatesPage() {
             onSave={handleSaveVariants}
             onCancel={() => setShowVariantEditor(false)}
             templateId={selectedTemplate._id}
+            templateName={selectedTemplate.name}
+            whatsappTemplateName={selectedTemplate.whatsappTemplateName}
             showToast={showToast}
           />
         )}

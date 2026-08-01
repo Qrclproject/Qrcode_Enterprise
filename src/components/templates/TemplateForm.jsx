@@ -26,13 +26,17 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
             placeholder="e.g., Invitation Message"
           />
         </div>
+
+        {/* ─── WhatsApp Template Name ─── */}
         <div>
-          <label className="text-xs font-semibold text-gray-500">WhatsApp Template Name</label>
+          <label className="text-xs font-semibold text-gray-500">
+            WhatsApp Template Name <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
             value={whatsappTemplateName}
             onChange={(e) => setWhatsappTemplateName(e.target.value)}
-            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
+            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm font-mono"
             required
             placeholder="Exact name from Meta Business Suite (e.g., invitation_message)"
           />
@@ -40,6 +44,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
             This must match the template name you created in your WhatsApp Business account.
           </p>
         </div>
+
         <div>
           <label className="text-xs font-semibold text-gray-500">Category</label>
           <select
@@ -53,6 +58,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
             <option value="custom">📋 Custom</option>
           </select>
         </div>
+
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -62,6 +68,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
           />
           <span className="text-xs text-gray-600">Include QR Code Header</span>
         </div>
+
         <div className="flex justify-end gap-2 pt-3 border-t">
           <button type="button" onClick={onClose} className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50">
             Cancel
