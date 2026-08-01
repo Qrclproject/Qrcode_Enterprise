@@ -70,7 +70,6 @@ function ModalDesignPreview({ design, isSelected, onSelect }) {
   const { x, y, width, height } = design.qrPosition || {};
   const hasDims = dims.w > 0 && dims.h > 0 && width;
 
-  // Percentage based placement mapping bounds dynamically 
   const style = hasDims ? {
     left: `${(x / dims.w) * 100}%`,
     top: `${(y / dims.h) * 100}%`,
@@ -87,9 +86,7 @@ function ModalDesignPreview({ design, isSelected, onSelect }) {
           : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
       }`}
     >
-      {/* Aspect-safe container frame */}
       <div className="w-full aspect-[4/3] rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center border border-gray-100 p-1">
-        {/* Relative layout boundaries calculated by wrapper scale factor */}
         <div className="relative inline-flex max-w-full max-h-full items-center justify-center">
           <img 
             src={design.imageUrl} 
@@ -106,7 +103,6 @@ function ModalDesignPreview({ design, isSelected, onSelect }) {
         </div>
       </div>
       
-      {/* Selection active indicator hook */}
       {isSelected && (
         <div className="absolute top-3 right-3 bg-orange-500 text-white w-4 h-4 rounded-full flex items-center justify-center shadow-md z-10">
           <i className="fas fa-check text-[8px]"></i>
@@ -129,7 +125,7 @@ export default function CampaignBuilderPage() {
 
   const [parsedData, setParsedData] = useState(null);
   const [columns, setColumns] = useState([]);
-  const [mapping, setMapping] = useState({ phone: '', name: '', event: '', qr: '', date: '' });
+  const [mapping, setMapping] = useState({ phone: '', qr: '', placeholders: {} });
   const [template, setTemplate] = useState('');
   const [previewRecipientIndex, setPreviewRecipientIndex] = useState(0);
   const [previewVariantIndex, setPreviewVariantIndex] = useState(0);
@@ -151,6 +147,7 @@ export default function CampaignBuilderPage() {
   const [qrGenTotal, setQrGenTotal] = useState(0);
   const [qrGenProgress, setQrGenProgress] = useState(0);
   const pollingRef = useRef(null);
+  const processedRef = useRef(false); // 👈 NEW: prevent duplicate processing
 
   // ─── Design and QR control ────────────────────────────────────
   const [designs, setDesigns] = useState([]);
@@ -174,7 +171,7 @@ export default function CampaignBuilderPage() {
           staticFallback.forEach(t => { defs[t.id] = t; });
           setTemplateDefs(defs);
           setActiveVariants(Object.fromEntries(staticFallback.map(t => [t.id, t.variants.map((v, i) => i)])));
-          setTemplate(staticFallback[0].id);
+          if (!template) setTemplate(staticFallback[0].id);
           return;
         }
 
@@ -182,7 +179,7 @@ export default function CampaignBuilderPage() {
         const defs = {};
         const av = {};
         apiTemplates.forEach(t => {
-          list.push({ id: t._id, name: t.name });
+          list.push({ id: t._id, name: t.name, whatsappTemplateName: t.whatsappTemplateName });
           defs[t._id] = {
             name: t.name,
             showQR: t.showQR ?? true,
@@ -197,7 +194,8 @@ export default function CampaignBuilderPage() {
         setTemplateList(list);
         setTemplateDefs(defs);
         setActiveVariants(av);
-        if (list.length > 0 && !template) {
+        // Only set template if it's empty (first load) – otherwise preserve existing
+        if (!template && list.length > 0) {
           setTemplate(list[0].id);
           setPreviewVariantIndex(av[list[0].id]?.[0] || 0);
         }
@@ -207,11 +205,11 @@ export default function CampaignBuilderPage() {
         staticFallback.forEach(t => { defs[t.id] = t; });
         setTemplateDefs(defs);
         setActiveVariants(Object.fromEntries(staticFallback.map(t => [t.id, t.variants.map((v, i) => i)])));
-        setTemplate(staticFallback[0].id);
+        if (!template) setTemplate(staticFallback[0].id);
         showToast('warning', 'Using offline templates', 'Could not fetch templates from server.');
       }
     })();
-  }, [showToast]);
+  }, [showToast, template]); // 👈 include template in deps to avoid overriding
 
   // ─── Fetch designs on mount ──────────────────────────────────
   useEffect(() => {
@@ -223,16 +221,13 @@ export default function CampaignBuilderPage() {
   // ─── Derived data ─────────────────────────────────────────────
   const total = parsedData?.length || 0;
   const currentRecipient = parsedData?.[previewRecipientIndex] || {};
-  const mappedName  = mapping.name  ? currentRecipient[mapping.name]  : '';
   const mappedPhone = mapping.phone ? currentRecipient[mapping.phone] : '';
-  const mappedEvent = mapping.event ? currentRecipient[mapping.event] : '';
-  const mappedDate  = mapping.date  ? currentRecipient[mapping.date]  : '';
-  const mappedQrUrl = mapping.qr    ? currentRecipient[mapping.qr]    : '';
+  const mappedQrUrl = mapping.qr ? currentRecipient[mapping.qr] : '';
 
   const tplDef = templateDefs[template] || { name: 'Unknown', showQR: true, variants: [] };
   const currentVariant = tplDef.variants?.[previewVariantIndex];
 
-  // ─── Message preview with custom variables ────────────────────
+  // ─── Message preview with dynamic placeholders ────────────────
   const getMessageBody = () => {
     let body = '';
     if (template === 'tpl4' || tplDef.name === 'Custom Message') {
@@ -241,21 +236,13 @@ export default function CampaignBuilderPage() {
       body = currentVariant?.body || tplDef.variants?.[0]?.body || '';
     }
 
-    const numberedVars = {
-      '{{1}}': mappedName,
-      '{{2}}': mappedEvent,
-      '{{3}}': mappedDate,
-      '{{4}}': currentRecipient['Time'] || currentRecipient['time'] || '9:00 AM',
-      '{{5}}': currentRecipient['Venue'] || currentRecipient['venue'] || 'Eko Convention Centre',
-      '{{6}}': currentRecipient['FeedbackLink'] || currentRecipient['feedbackLink'] || '[feedback link]',
-    };
-    Object.keys(numberedVars).forEach((key) => {
-      body = body.replaceAll(key, numberedVars[key] || key);
-    });
-
-    body = body.replace(/\{\{(.*?)\}\}/g, (match, columnName) => {
-      const value = currentRecipient[columnName];
-      return value !== undefined ? String(value) : match;
+    body = body.replace(/{{(\d+)}}/g, (match, num) => {
+      const columnName = mapping.placeholders?.[num];
+      if (columnName) {
+        const value = currentRecipient[columnName];
+        return value !== undefined && value !== '' ? String(value) : match;
+      }
+      return match;
     });
 
     body = body.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
@@ -265,16 +252,34 @@ export default function CampaignBuilderPage() {
 
   // ─── Auto‑mapping helper ──────────────────────────────────────
   const computeMapping = useCallback((cols) => {
-    if (!cols || cols.length === 0) return { phone: '', name: '', event: '', qr: '', date: '' };
+    if (!cols || cols.length === 0) return { phone: '', qr: '', placeholders: {} };
+    
     const exact = (preferred) => cols.find(c => c.trim().toLowerCase() === preferred.toLowerCase()) || '';
     const contains = (keywords) => cols.find(c => keywords.every(kw => c.toLowerCase().includes(kw))) || '';
-    return {
-      phone: exact('phone number') || contains(['phone', 'number']) || contains(['phone']),
-      name:  exact('attendee name') || exact('full name') || exact('name') || contains(['name']),
-      event: exact('event name') || contains(['event', 'name']) || contains(['event']),
-      qr:    exact('qr code image url') || contains(['qr', 'image']) || contains(['qr']),
-      date:  exact('event date') || exact('date') || contains(['date']),
-    };
+    
+    const phone = exact('phone number') || contains(['phone', 'number']) || contains(['phone']);
+    const qr = exact('qr code image url') || contains(['qr', 'image']) || contains(['qr']);
+    
+    const placeholders = {};
+    const nameCol = exact('attendee name') || exact('full name') || exact('name') || contains(['name']);
+    const eventCol = exact('event name') || contains(['event', 'name']) || contains(['event']);
+    const dateCol = exact('event date') || exact('date') || contains(['date']);
+    const timeCol = contains(['time']);
+    const venueCol = contains(['venue']);
+    const senderCol = contains(['sender', 'from']);
+    const dress1Col = contains(['dress', 'code', '1']);
+    const dress2Col = contains(['dress', 'code', '2']);
+    
+    if (nameCol) placeholders['1'] = nameCol;
+    if (eventCol) placeholders['2'] = eventCol;
+    if (dateCol) placeholders['3'] = dateCol;
+    if (timeCol) placeholders['4'] = timeCol;
+    if (venueCol) placeholders['5'] = venueCol;
+    if (senderCol) placeholders['8'] = senderCol;
+    if (dress1Col) placeholders['6'] = dress1Col;
+    if (dress2Col) placeholders['7'] = dress2Col;
+    
+    return { phone, qr, placeholders };
   }, []);
 
   // ─── QR polling helpers ───────────────────────────────────────
@@ -302,14 +307,11 @@ export default function CampaignBuilderPage() {
             const updated = await getCampaignById(cid);
             const campaign = updated?.data || updated;
             if (campaign?.recipients) {
-              const flat = campaign.recipients.map(r => ({
-                'Attendee Name': r.name || '',
-                'Phone Number': r.phone || '',
-                'QR Code Image URL': r.qrUrl || '',
-                'Event Name': r.event || '',
-                'Event Date': r.date || '',
-              }));
+              const flat = campaign.recipients.map(r => ({ ...r, 'Phone Number': r.phone }));
               setParsedData(flat);
+              if (flat.length > 0) {
+                setColumns(Object.keys(flat[0]));
+              }
             }
           } else {
             showToast('error', 'QR generation failed', 'Some QR codes could not be created.');
@@ -337,13 +339,11 @@ export default function CampaignBuilderPage() {
     }
 
     try {
-      const recipients = data.map(row => ({
-        phone: String(row[mappingObj.phone] ?? ''),
-        name: String(row[mappingObj.name] ?? ''),
-        event: String(row[mappingObj.event] ?? ''),
-        date: String(row[mappingObj.date] ?? ''),
-        qrUrl: '',
-      }));
+      const recipients = data.map(row => {
+        const rec = { ...row };
+        rec.phone = row[mappingObj.phone] || '';
+        return rec;
+      });
 
       const campaignData = {
         name: 'Campaign ' + new Date().toLocaleDateString(),
@@ -357,10 +357,8 @@ export default function CampaignBuilderPage() {
         variants: (templateDefs[template]?.variants || []).map(v => v.label),
         mapping: {
           phone: String(mappingObj.phone),
-          name: String(mappingObj.name),
-          event: String(mappingObj.event),
           qr: String(mappingObj.qr),
-          date: String(mappingObj.date),
+          ...mappingObj.placeholders,
         },
         designId: generateQr ? (designId || undefined) : undefined,
       };
@@ -382,36 +380,64 @@ export default function CampaignBuilderPage() {
     } catch (err) {
       showToast('error', 'Campaign creation failed', err.message);
     }
-  }, [template, batchSize, waitValue, waitUnit, activeVariants, templateDefs, designId, generateQr, showToast]);
+  }, [template, batchSize, waitValue, waitUnit, activeVariants, templateDefs, designId, generateQr, showToast, startQrPolling]);
 
-useEffect(() => {
-  if (location.state?.spreadsheetData) {
-    console.log('📥 Spreadsheet data received');
-    console.log('Current template:', template);
-    console.log('Current previewVariantIndex:', previewVariantIndex);
-    console.log('Active variants for template:', activeVariants[template]);
+  // ─── Receive data from spreadsheet editor with restoration ──
+  useEffect(() => {
+    // Check if we have spreadsheet data from the editor
+    if (!location.state?.spreadsheetData) return;
+
+    // If we have a restoreState object, apply it first
+    const restoreState = location.state?.restoreState;
+    if (restoreState) {
+      if (restoreState.template) setTemplate(restoreState.template);
+      if (restoreState.mapping) setMapping(restoreState.mapping);
+      if (restoreState.batchSize) setBatchSize(restoreState.batchSize);
+      if (restoreState.waitValue) setWaitValue(restoreState.waitValue);
+      if (restoreState.waitUnit) setWaitUnit(restoreState.waitUnit);
+      if (restoreState.activeVariants) setActiveVariants(restoreState.activeVariants);
+      if (restoreState.customMessage !== undefined) setCustomMessage(restoreState.customMessage);
+      if (restoreState.designId !== undefined) setDesignId(restoreState.designId);
+      if (restoreState.generateQr !== undefined) setGenerateQr(restoreState.generateQr);
+      // Also restore preview variant if provided
+      if (restoreState.previewVariantIndex !== undefined) setPreviewVariantIndex(restoreState.previewVariantIndex);
+    }
+
+    // Prevent duplicate processing
+    if (processedRef.current) return;
+    processedRef.current = true;
 
     const data = location.state.spreadsheetData;
     setParsedData(data);
     const cols = Object.keys(data[0] || {});
     setColumns(cols);
     const newMapping = computeMapping(cols);
-    setMapping(newMapping);
+    // Merge with restored mapping if any (restoreState may have overridden some fields)
+    setMapping(prev => {
+      const merged = { ...newMapping };
+      // If we have a restored mapping, use its placeholders if they exist
+      if (restoreState?.mapping?.placeholders) {
+        merged.placeholders = { ...newMapping.placeholders, ...restoreState.mapping.placeholders };
+      }
+      if (restoreState?.mapping?.phone) merged.phone = restoreState.mapping.phone;
+      if (restoreState?.mapping?.qr) merged.qr = restoreState.mapping.qr;
+      return merged;
+    });
+
     setPreviewRecipientIndex(0);
 
     const active = activeVariants[template] || [];
     if (!active.includes(previewVariantIndex)) {
       const newIdx = active[0] || 0;
-      console.log('🔄 Resetting previewVariantIndex from', previewVariantIndex, 'to', newIdx);
       setPreviewVariantIndex(newIdx);
-    } else {
-      console.log('✅ Keeping previewVariantIndex =', previewVariantIndex);
     }
 
     window.history.replaceState({}, document.title);
-    processSpreadsheetData(data, newMapping);
-  }
-}, [location.state?.spreadsheetData, computeMapping, processSpreadsheetData, activeVariants, template, previewVariantIndex]);
+    processSpreadsheetData(data, mapping); // use current mapping (which may include restored)
+
+    setTimeout(() => { processedRef.current = false; }, 500);
+  }, [location.state?.spreadsheetData, location.state?.restoreState]);
+
   // ─── Load campaign from Sent History ───────────────────────────
   useEffect(() => {
     const c = location.state?.campaignToLoad;
@@ -424,16 +450,19 @@ useEffect(() => {
   const loadCampaignFromHistory = (campaign) => {
     const recipients = campaign.recipients || [];
     if (recipients.length === 0) recipients.push({ phone: '+1234567890', name: 'Sample', event: 'Sample Event', date: '2026-01-01', qrUrl: '' });
-    const flat = recipients.map(r => ({
-      'Attendee Name': r.name || '',
-      'Phone Number': r.phone || '',
-      'QR Code Image URL': r.qrUrl || '',
-      'Event Name': r.event || '',
-      'Event Date': r.date || '',
-    }));
+    const flat = recipients.map(r => ({ ...r }));
     setParsedData(flat);
     setColumns(flat.length > 0 ? Object.keys(flat[0]) : []);
-    setMapping({ phone: 'Phone Number', name: 'Attendee Name', event: 'Event Name', qr: 'QR Code Image URL', date: 'Event Date' });
+    const mappingData = campaign.mapping || {};
+    const phone = mappingData.phone || 'phone';
+    const qr = mappingData.qr || 'qrUrl';
+    const placeholders = {};
+    Object.keys(mappingData).forEach(key => {
+      if (key !== 'phone' && key !== 'qr') {
+        placeholders[key] = mappingData[key];
+      }
+    });
+    setMapping({ phone, qr, placeholders });
     setTemplate(campaign.templateKey || templateList[0]?.id || 'tpl1');
     setBatchSize(campaign.batchSize || 10);
     setWaitValue(campaign.waitValue || 5);
@@ -442,6 +471,23 @@ useEffect(() => {
     setPreviewRecipientIndex(0);
     setPreviewVariantIndex((campaign.activeVariants || [0])[0] || 0);
     showToast('info', 'Campaign Loaded', `"${campaign.name}" is ready for editing.`);
+  };
+
+  // ─── Validate that all placeholders are mapped ──────────────
+  const validateAllMapped = () => {
+    const activeVariant = tplDef?.variants?.find(v => v.active) || tplDef?.variants?.[0];
+    if (!activeVariant) return { ok: false, msg: 'No active variant found.' };
+
+    const placeholders = activeVariant.body.match(/{{(\d+)}}/g) || [];
+    const unmapped = placeholders.filter(p => {
+      const num = p.match(/\d+/)[0];
+      return !mapping.placeholders?.[num];
+    });
+
+    if (unmapped.length > 0) {
+      return { ok: false, msg: `Missing mapping for: ${unmapped.join(', ')}. Please map them in the "COLUMN MAPPING" panel.` };
+    }
+    return { ok: true };
   };
 
   // ─── Variant management ────────────────────────────────────────
@@ -500,7 +546,17 @@ useEffect(() => {
 
   // ─── Launch / test / retry ─────────────────────────────────────
   const handleLaunch = async () => {
-    if (!parsedData || total === 0) return;
+    if (!parsedData || total === 0) {
+      showToast('error', 'No data', 'Please upload a spreadsheet first.');
+      return;
+    }
+
+    const validation = validateAllMapped();
+    if (!validation.ok) {
+      showToast('warning', 'Incomplete Mapping', validation.msg);
+      return;
+    }
+
     const cid = campaignId;
     if (!cid) {
       showToast('error', 'No campaign', 'Please upload a file first.');
@@ -545,7 +601,7 @@ useEffect(() => {
     clearPolling();
     setParsedData(null);
     setColumns([]);
-    setMapping({ phone: '', name: '', event: '', qr: '', date: '' });
+    setMapping({ phone: '', qr: '', placeholders: {} });
     setPreviewRecipientIndex(0);
     const firstId = templateList[0]?.id || 'tpl1';
     setTemplate(firstId);
@@ -566,6 +622,7 @@ useEffect(() => {
     setQrGenProgress(0);
     setDesignId('');
     setGenerateQr(false);
+    processedRef.current = false;
   };
 
   // ─── Toggle QR generation ─────────────────────────────────────
@@ -593,9 +650,22 @@ useEffect(() => {
     );
   }
 
+  // ─── Build restore state for navigation ──────────────────────
+  const buildRestoreState = () => ({
+    template,
+    mapping,
+    batchSize,
+    waitValue,
+    waitUnit,
+    activeVariants,
+    customMessage,
+    designId,
+    generateQr,
+    previewVariantIndex,
+  });
+
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-5 pb-20">
-      
       <div className="mb-5 flex justify-between items-end">
         <div>
           <h1 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
@@ -605,19 +675,34 @@ useEffect(() => {
         </div>
         <div className="flex items-center gap-4">
           {total > 0 && (
-            <button
-              onClick={handleReset}
-              className="text-xs text-red-600 hover:underline bg-transparent border-none cursor-pointer"
-            >
-              <i className="fas fa-trash-alt mr-1"></i> Remove Sheet
-            </button>
+            <>
+              <button
+                onClick={() => navigate('/spreadsheet-editor', {
+                  state: {
+                    parsedData,
+                    fileName: 'current_sheet',
+                    restoreState: buildRestoreState(), // 👈 pass current settings
+                  }
+                })}
+                className="text-xs text-blue-600 hover:underline bg-transparent border-none cursor-pointer"
+              >
+                <i className="fas fa-edit mr-1"></i> Edit Data
+              </button>
+              <button
+                onClick={handleReset}
+                className="text-xs text-red-600 hover:underline bg-transparent border-none cursor-pointer"
+              >
+                <i className="fas fa-trash-alt mr-1"></i> Remove Sheet
+              </button>
+            </>
           )}
           <div className="text-xs bg-orange-50 text-orange-600 px-3 py-1.5 rounded-full font-bold border border-orange-100">
             {total} recipients
           </div>
         </div>
       </div>
-  {total > 0 && (
+
+      {total > 0 && (
         <div className="mt-4">
           <BatchPreview batchSize={batchSize} total={total} />
         </div>
@@ -632,6 +717,7 @@ useEffect(() => {
           />
         </div>
       )}
+
       {/* QR generation progress banners */}
       {qrGenStatus === 'processing' && (
         <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-3">
@@ -670,7 +756,6 @@ useEffect(() => {
       >
         <div className="flex flex-col h-full space-y-4 pt-1">
           {designs.length === 0 ? (
-            /* --- Empty State View --- */
             <div className="text-center py-8 px-4 border border-dashed border-gray-200 rounded-xl bg-gray-50/50 flex flex-col items-center justify-center">
               <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 mb-3">
                 <i className="fas fa-paint-brush text-sm"></i>
@@ -687,13 +772,10 @@ useEffect(() => {
               </button>
             </div>
           ) : (
-            /* --- Content State View --- */
             <>
               <p className="text-xs text-gray-500 -mt-1">
                 Select a template layout below to automatically project your campaign QR code mapping.
               </p>
-              
-              {/* Dynamic Grid using our new aspect-safe subcomponent */}
               <div className="grid grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200">
                 {designs.map((d) => (
                   <ModalDesignPreview
@@ -704,8 +786,6 @@ useEffect(() => {
                   />
                 ))}
               </div>
-
-              {/* Quick routing button to add designs */}
               <button
                 onClick={() => { navigate('/designs'); setShowDesignModal(false); }}
                 className="w-full py-2 border border-dashed border-gray-300 text-gray-600 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50/20 rounded-lg text-xs font-medium transition-all"
@@ -714,8 +794,6 @@ useEffect(() => {
               </button>
             </>
           )}
-
-          {/* --- Modal Action Footer --- */}
           <div className="flex justify-end pt-2 border-t border-gray-100 gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowDesignModal(false)}>
               Cancel
@@ -724,7 +802,7 @@ useEffect(() => {
         </div>
       </Modal>
 
-      {/* Main Builder panels space layout grid */}
+      {/* Main Builder panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <UploadPanel onReset={handleReset} />
         <MappingPanel
@@ -741,7 +819,7 @@ useEffect(() => {
           setCustomMessage={setCustomMessage}
         />
         <PreviewPanel
-          recipientData={{ name: mappedName, phone: mappedPhone }}
+          recipientData={{ name: currentRecipient[mapping.placeholders?.[1]] || '', phone: mappedPhone }}
           messageText={messagePreview}
           qrUrl={generateQr ? mappedQrUrl : ''}
           showQR={generateQr && tplDef.showQR !== false}
@@ -773,8 +851,6 @@ useEffect(() => {
           selectedDesignName={designs.find(d => d._id === designId)?.name || 'None'}
         />
       </div>
-
-    
     </div>
   );
 }

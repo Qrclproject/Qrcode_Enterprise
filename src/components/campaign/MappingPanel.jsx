@@ -1,6 +1,12 @@
 // src/components/campaign/MappingPanel.jsx
 import { useState } from 'react';
 
+// ─── Helper: extract placeholder numbers from a string ──────────
+const extractPlaceholders = (body) => {
+  const matches = body.match(/{{(\d+)}}/g) || [];
+  return matches.map(m => parseInt(m.match(/\d+/)[0], 10)).sort((a, b) => a - b);
+};
+
 export default function MappingPanel({
   columns,
   mapping,
@@ -16,15 +22,20 @@ export default function MappingPanel({
 }) {
   const tplDef = templateDefinitions[template];
 
+  // Get the first active variant (or the first variant if none active)
+  const activeVariant = tplDef?.variants?.find(v => v.active) || tplDef?.variants?.[0];
+  const placeholders = activeVariant ? extractPlaceholders(activeVariant.body) : [];
+
   return (
     <div className="dashboard-panel p-4">
       <div className="panel-header"><div className="panel-badge">2</div> COLUMN MAPPING</div>
       <div className="space-y-3 flex-1">
-        {/* Phone */}
+        
+        {/* ─── Phone Number (always required) ─── */}
         <div>
           <label className="text-[10px] font-semibold text-gray-400 uppercase">Phone Number</label>
           <select
-            value={mapping.phone}
+            value={mapping.phone || ''}
             onChange={(e) => setMapping({ ...mapping, phone: e.target.value })}
             className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
           >
@@ -32,35 +43,12 @@ export default function MappingPanel({
             {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
           </select>
         </div>
-        {/* Name */}
-        <div>
-          <label className="text-[10px] font-semibold text-gray-400 uppercase">Name → {"{{1}}"}</label>
-          <select
-            value={mapping.name}
-            onChange={(e) => setMapping({ ...mapping, name: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
-          >
-            <option value="">-- Select Column --</option>
-            {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
-          </select>
-        </div>
-        {/* Event */}
-        <div>
-          <label className="text-[10px] font-semibold text-gray-400 uppercase">Event → {"{{2}}"}</label>
-          <select
-            value={mapping.event}
-            onChange={(e) => setMapping({ ...mapping, event: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
-          >
-            <option value="">-- Select Column --</option>
-            {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
-          </select>
-        </div>
-        {/* QR */}
+
+        {/* ─── QR Image URL (optional, for header) ─── */}
         <div>
           <label className="text-[10px] font-semibold text-gray-400 uppercase">QR Image URL → Header</label>
           <select
-            value={mapping.qr}
+            value={mapping.qr || ''}
             onChange={(e) => setMapping({ ...mapping, qr: e.target.value })}
             className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
           >
@@ -68,20 +56,29 @@ export default function MappingPanel({
             {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
           </select>
         </div>
-        {/* Date */}
-        <div>
-          <label className="text-[10px] font-semibold text-gray-400 uppercase">Date → {"{{3}}"}</label>
-          <select
-            value={mapping.date}
-            onChange={(e) => setMapping({ ...mapping, date: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
-          >
-            <option value="">-- Select Column --</option>
-            {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
-          </select>
-        </div>
 
-        {/* Template Selector */}
+        {/* ─── DYNAMIC PLACEHOLDER MAPPINGS ─── */}
+        {placeholders.map(num => (
+          <div key={num}>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">
+              Placeholder {num} → {"{{" + num + "}}"}
+            </label>
+            <select
+              value={mapping.placeholders?.[num] || ''}
+              onChange={(e) => {
+                const newPlaceholders = { ...(mapping.placeholders || {}) };
+                newPlaceholders[num] = e.target.value;
+                setMapping({ ...mapping, placeholders: newPlaceholders });
+              }}
+              className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
+            >
+              <option value="">-- Select Column --</option>
+              {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
+            </select>
+          </div>
+        ))}
+
+        {/* ─── Template Selector ─── */}
         <div className="pt-2 border-t">
           <label className="text-[10px] font-semibold text-gray-400 uppercase">Template Category</label>
           <select
@@ -90,12 +87,14 @@ export default function MappingPanel({
             className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 font-medium"
           >
             {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+              <option key={t.id} value={t.id}>
+                {t.name} {t.whatsappTemplateName ? `(WhatsApp: ${t.whatsappTemplateName})` : ''}
+              </option>
             ))}
           </select>
         </div>
 
-        {/* Variant Pills (only for tpl1-tpl3) */}
+        {/* ─── Variant Pills ─── */}
         {template !== 'tpl4' && (
           <div className="pt-1">
             <label className="text-[10px] font-semibold text-gray-400 uppercase">
@@ -123,7 +122,7 @@ export default function MappingPanel({
           </div>
         )}
 
-        {/* Custom Message (only for tpl4) */}
+        {/* ─── Custom Message (only for tpl4) ─── */}
         {template === 'tpl4' && (
           <div className="pt-1">
             <textarea

@@ -7,6 +7,7 @@ export default function SpreadsheetEditorPage() {
   const [data, setData] = useState([]);
   const [columns, setColumns] = useState([]);
   const [fileName, setFileName] = useState('');
+  const [restoreState, setRestoreState] = useState(null); // 👈 new
 
   useEffect(() => {
     const state = location.state;
@@ -15,6 +16,10 @@ export default function SpreadsheetEditorPage() {
       const parsed = state.parsedData;
       setColumns(Object.keys(parsed[0] || {}));
       setData(parsed);
+      // Capture restoreState if provided
+      if (state.restoreState) {
+        setRestoreState(state.restoreState);
+      }
     } else {
       // No data – redirect back
       navigate('/', { replace: true });
@@ -81,7 +86,19 @@ export default function SpreadsheetEditorPage() {
 
   // ─── Save and go to Campaign Builder ──────────────────────────
   const handleSave = () => {
-    navigate('/', { state: { spreadsheetData: data, fileName } });
+    // Pass back the updated data and the restoreState (if any)
+    navigate('/', { 
+      state: { 
+        spreadsheetData: data, 
+        fileName,
+        restoreState, // 👈 send it back so campaign page can restore settings
+      } 
+    });
+  };
+
+  // ─── Cancel – go back without saving ─────────────────────────
+  const handleCancel = () => {
+    navigate(-1); // go back to previous page (campaign builder)
   };
 
   return (
@@ -110,13 +127,19 @@ export default function SpreadsheetEditorPage() {
               + Add Column
             </button>
             <div className="flex gap-2">
-  <button onClick={() => navigate(-1)} className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50">
-    Cancel
-  </button>
-  <button onClick={handleSave} className="bg-orange-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-orange-600">
-    Save & Continue
-  </button>
-</div>
+              <button 
+                onClick={handleCancel} 
+                className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSave} 
+                className="bg-orange-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-orange-600"
+              >
+                Save & Continue
+              </button>
+            </div>
           </div>
         </div>
 
