@@ -11,8 +11,8 @@ import {
   updateTemplate,
   cloneTemplate,
   deleteTemplate,
-  bulkDeleteTemplates,        // new
-  deleteTemplateVariant,       // new (used inside VariantEditor if needed)
+  bulkDeleteTemplates,
+  deleteTemplateVariant,
 } from '../services/templateService';
 
 export default function TemplatesPage() {
@@ -75,15 +75,21 @@ export default function TemplatesPage() {
     }
   };
 
-  // Create or update template basic info (unchanged)
-  const handleFormSave = async ({ name, category, showQR }) => {
+  // 👇 UPDATED: Create or update template with whatsappTemplateName
+  const handleFormSave = async ({ name, whatsappTemplateName, category, showQR }) => {
     try {
       if (selectedTemplate) {
-        await updateTemplate(selectedTemplate._id, { name, category, showQR });
+        await updateTemplate(selectedTemplate._id, {
+          name,
+          whatsappTemplateName,
+          category,
+          showQR,
+        });
         showToast('success', 'Updated', `Template "${name}" updated.`);
       } else {
         await createTemplate({
           name,
+          whatsappTemplateName,
           category,
           showQR,
           variants: [
@@ -121,7 +127,7 @@ export default function TemplatesPage() {
     setShowVariantEditor(false);
   };
 
-  // Clone a template via API (unchanged)
+  // Clone a template via API
   const handleClone = async (id) => {
     try {
       await cloneTemplate(id);
@@ -132,7 +138,7 @@ export default function TemplatesPage() {
     }
   };
 
-  // Delete a single template (unchanged)
+  // Delete a single template
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
@@ -265,7 +271,7 @@ export default function TemplatesPage() {
         initialData={selectedTemplate}
       />
 
-      {/* Variant Editor Modal – now passes templateId and showToast for individual variant deletion */}
+      {/* Variant Editor Modal */}
       <Modal
         isOpen={showVariantEditor}
         onClose={() => setShowVariantEditor(false)}
@@ -277,8 +283,8 @@ export default function TemplatesPage() {
             variants={selectedTemplate.variants}
             onSave={handleSaveVariants}
             onCancel={() => setShowVariantEditor(false)}
-            templateId={selectedTemplate._id}   // needed for backend deletion
-            showToast={showToast}               // needed for feedback
+            templateId={selectedTemplate._id}
+            showToast={showToast}
           />
         )}
       </Modal>

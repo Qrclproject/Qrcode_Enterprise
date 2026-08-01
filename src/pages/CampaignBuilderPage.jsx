@@ -384,21 +384,34 @@ export default function CampaignBuilderPage() {
     }
   }, [template, batchSize, waitValue, waitUnit, activeVariants, templateDefs, designId, generateQr, showToast]);
 
-  // ─── Receive data from spreadsheet editor ────────────────────
-  useEffect(() => {
-    if (location.state?.spreadsheetData) {
-      const data = location.state.spreadsheetData;
-      setParsedData(data);
-      const cols = Object.keys(data[0] || {});
-      setColumns(cols);
-      const newMapping = computeMapping(cols);
-      setMapping(newMapping);
-      setPreviewRecipientIndex(0);
-      window.history.replaceState({}, document.title);
-      processSpreadsheetData(data, newMapping);
-    }
-  }, [location.state?.spreadsheetData, computeMapping, processSpreadsheetData]);
+useEffect(() => {
+  if (location.state?.spreadsheetData) {
+    console.log('📥 Spreadsheet data received');
+    console.log('Current template:', template);
+    console.log('Current previewVariantIndex:', previewVariantIndex);
+    console.log('Active variants for template:', activeVariants[template]);
 
+    const data = location.state.spreadsheetData;
+    setParsedData(data);
+    const cols = Object.keys(data[0] || {});
+    setColumns(cols);
+    const newMapping = computeMapping(cols);
+    setMapping(newMapping);
+    setPreviewRecipientIndex(0);
+
+    const active = activeVariants[template] || [];
+    if (!active.includes(previewVariantIndex)) {
+      const newIdx = active[0] || 0;
+      console.log('🔄 Resetting previewVariantIndex from', previewVariantIndex, 'to', newIdx);
+      setPreviewVariantIndex(newIdx);
+    } else {
+      console.log('✅ Keeping previewVariantIndex =', previewVariantIndex);
+    }
+
+    window.history.replaceState({}, document.title);
+    processSpreadsheetData(data, newMapping);
+  }
+}, [location.state?.spreadsheetData, computeMapping, processSpreadsheetData, activeVariants, template, previewVariantIndex]);
   // ─── Load campaign from Sent History ───────────────────────────
   useEffect(() => {
     const c = location.state?.campaignToLoad;

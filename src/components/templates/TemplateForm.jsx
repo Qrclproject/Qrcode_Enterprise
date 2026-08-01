@@ -3,26 +3,42 @@ import Modal from '../common/Modal';
 
 export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
   const [name, setName] = useState(initialData?.name || '');
+  const [whatsappTemplateName, setWhatsappTemplateName] = useState(initialData?.whatsappTemplateName || '');
   const [category, setCategory] = useState(initialData?.category || 'delivery');
   const [showQR, setShowQR] = useState(initialData?.showQR ?? true);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave({ name, category, showQR });
+    onSave({ name, whatsappTemplateName, category, showQR });
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={initialData ? 'Edit Template' : 'Create Template'} size="max-w-lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="text-xs font-semibold text-gray-500">Template Name</label>
+          <label className="text-xs font-semibold text-gray-500">Template Name (Internal)</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
             required
+            placeholder="e.g., Invitation Message"
           />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500">WhatsApp Template Name</label>
+          <input
+            type="text"
+            value={whatsappTemplateName}
+            onChange={(e) => setWhatsappTemplateName(e.target.value)}
+            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
+            required
+            placeholder="Exact name from Meta Business Suite (e.g., invitation_message)"
+          />
+          <p className="text-[10px] text-gray-400 mt-1">
+            This must match the template name you created in your WhatsApp Business account.
+          </p>
         </div>
         <div>
           <label className="text-xs font-semibold text-gray-500">Category</label>
