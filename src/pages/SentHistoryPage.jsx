@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CampaignList from '../components/campaign/CampaignList';
 import Modal from '../components/common/Modal';
@@ -9,9 +9,10 @@ import {
   deleteCampaign,
   retryFailedMessages,
   launchCampaign,
+  deleteAllCampaigns, // 👈 import
 } from '../services/campaignService';
 
-// ─── helpers (unchanged) ──────────────────────────────────────
+// ─── helpers ──────────────────────────────────────────────────────
 const formatWaitDisplay = (value, unit) => {
   const abbr = { seconds: 'sec', minutes: 'min', hours: 'hr', days: 'day(s)' };
   return `${value} ${abbr[unit] || unit}`;
@@ -54,6 +55,7 @@ export default function SentHistoryPage() {
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
 
   const [editBatchSize, setEditBatchSize] = useState(10);
@@ -62,7 +64,7 @@ export default function SentHistoryPage() {
 
   const showToast = useToast();
 
-  // ─── Fetch campaigns from backend ──────────────────────────
+  // ─── Fetch campaigns ──────────────────────────────────────────
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
     try {
@@ -71,7 +73,7 @@ export default function SentHistoryPage() {
       if (search.trim()) params.search = search;
 
       const res = await getCampaignHistory(params);
-      const data = res.data || res;   // adjust depending on response structure
+      const data = res.data || res;
       setCampaigns(data.campaigns || []);
       setTotalCount(data.total || 0);
       setTotalPages(data.totalPages || 1);
@@ -87,12 +89,11 @@ export default function SentHistoryPage() {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
-  // ─── Reset page when filters change ────────────────────────
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter]);
 
-  // ─── Delete campaign ───────────────────────────────────────
+  // ─── Delete single campaign ──────────────────────────────────
   const confirmDelete = async () => {
     if (!selectedCampaign) return;
     try {
@@ -106,7 +107,19 @@ export default function SentHistoryPage() {
     setSelectedCampaign(null);
   };
 
-  // ─── Retry single failed recipient (via API) ───────────────
+  // ─── Delete ALL campaigns ────────────────────────────────────
+  const confirmDeleteAll = async () => {
+    try {
+      await deleteAllCampaigns();
+      showToast('success', 'All Deleted', 'All campaigns and QR images have been removed.');
+      fetchCampaigns();
+    } catch (err) {
+      showToast('error', 'Delete all failed', err.response?.data?.message || err.message);
+    }
+    setDeleteAllModalOpen(false);
+  };
+
+  // ─── Retry functions ──────────────────────────────────────────
   const retrySingle = async (campaignId, index) => {
     try {
       await retryFailedMessages(campaignId);
@@ -117,7 +130,6 @@ export default function SentHistoryPage() {
     }
   };
 
-  // ─── Retry all failed ──────────────────────────────────────
   const retryAllFailed = async () => {
     if (!selectedCampaign) return;
     try {
@@ -129,11 +141,9 @@ export default function SentHistoryPage() {
     }
   };
 
-  // ─── Resend with new batch settings (placeholder) ──────────
+  // ─── Resend with new settings ─────────────────────────────────
   const applyAndResend = async () => {
     if (!selectedCampaign) return;
-    // In a full implementation you would update campaign settings and re‑launch.
-    // For now, simply re‑launch the existing campaign.
     try {
       await launchCampaign(selectedCampaign._id);
       showToast('success', 'Resend Initiated', 'Campaign restarted with new settings.');
@@ -144,7 +154,7 @@ export default function SentHistoryPage() {
     closeEditModal();
   };
 
-  // ─── Open edit modal ───────────────────────────────────────
+  // ─── Edit modal ───────────────────────────────────────────────
   const openEditModal = (campaignId) => {
     const campaign = campaigns.find(c => c._id === campaignId);
     if (!campaign) return;
@@ -160,22 +170,20 @@ export default function SentHistoryPage() {
     setSelectedCampaign(null);
   };
 
-  // ─── Navigate to Campaign Builder ─────────────────────────
   const openInCampaignBuilder = () => {
     if (!selectedCampaign) return;
     navigate('/', { state: { campaignToLoad: selectedCampaign } });
     closeEditModal();
   };
 
-  // ─── Derive stats from current page data? (or total?) ─────
-  // Since stats are across all campaigns, we'll keep them global using totalCount
+  // ─── Stats ────────────────────────────────────────────────────
   const statTotal = totalCount;
-  const statDelivered = campaigns.filter(c => c.status === 'completed').length; // adjust if needed
+  const statDelivered = campaigns.filter(c => c.status === 'completed').length;
   const statFailed = campaigns.filter(c => c.status === 'failed').length;
   const statScheduled = campaigns.filter(c => c.status === 'scheduled').length;
 
   // ─── Prepare page data ─────────────────────────────────────
-  const pageData = campaigns; // already paginated from backend
+  const pageData = campaigns; // already paginated
 
   // ─── Loading state ─────────────────────────────────────────
   if (loading) {
@@ -217,6 +225,14 @@ export default function SentHistoryPage() {
               <option value="failed">Failed</option>
               <option value="cancelled">Cancelled</option>
             </select>
+            {totalCount > 0 && (
+              <button
+                onClick={() => setDeleteAllModalOpen(true)}
+                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+              >
+                <i className="fas fa-trash-alt mr-1"></i> Delete All
+              </button>
+            )}
           </div>
         </div>
 
@@ -316,7 +332,6 @@ export default function SentHistoryPage() {
                   <div className="flex justify-between"><span>Wait Per Batch:</span> <strong>{formatWaitDisplay(editWaitValue, editWaitUnit)}</strong></div>
                   <div className="flex justify-between text-emerald-700"><span>Total Est. Time:</span> <strong>{formatDuration((Math.ceil((selectedCampaign.recipients?.length || 0) / Math.max(1, editBatchSize)) - 1) * getWaitSeconds(editWaitValue, editWaitUnit))}</strong></div>
                 </div>
-                {/* mini batch table */}
                 <div className="bg-white rounded-lg border p-2 max-h-40 overflow-y-auto">
                   <h4 className="text-[10px] font-semibold text-gray-400 uppercase mb-1">Batch Preview</h4>
                   <div className="text-[9px] space-y-0.5">
@@ -346,11 +361,7 @@ export default function SentHistoryPage() {
                 <div className="max-h-48 overflow-y-auto text-xs">
                   <table className="w-full text-left">
                     <thead className="text-red-500 border-b border-red-200">
-                      <tr>
-                        <th className="py-1">Phone</th>
-                        <th className="py-1">Reason</th>
-                        <th className="py-1 text-right">Action</th>
-                      </tr>
+                      <tr><th className="py-1">Phone</th><th className="py-1">Reason</th><th className="py-1 text-right">Action</th></tr>
                     </thead>
                     <tbody>
                       {selectedCampaign.recipients?.filter(r => r.status === 'failed').map((r, idx) => (
@@ -358,12 +369,7 @@ export default function SentHistoryPage() {
                           <td className="py-1">{r.phone}</td>
                           <td className="py-1 text-red-500">{r.failureReason || 'Unknown'}</td>
                           <td className="py-1 text-right">
-                            <button
-                              onClick={() => retrySingle(selectedCampaign._id, idx)}
-                              className="text-red-600 hover:underline text-xs"
-                            >
-                              Retry
-                            </button>
+                            <button onClick={() => retrySingle(selectedCampaign._id, idx)} className="text-red-600 hover:underline text-xs">Retry</button>
                           </td>
                         </tr>
                       ))}
@@ -371,9 +377,7 @@ export default function SentHistoryPage() {
                   </table>
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <button onClick={retryAllFailed} className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition">
-                    Retry All Failed
-                  </button>
+                  <button onClick={retryAllFailed} className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition">Retry All Failed</button>
                   <span className="text-xs text-red-500 self-center">{selectedCampaign.failed} remaining</span>
                 </div>
               </div>
@@ -389,14 +393,7 @@ export default function SentHistoryPage() {
               {selectedCampaign.variants?.map((v, idx) => {
                 const isActive = selectedCampaign.activeVariants?.includes(idx);
                 return (
-                  <span
-                    key={idx}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium ${
-                      isActive
-                        ? 'bg-orange-100 text-orange-700 border border-orange-300'
-                        : 'bg-gray-100 text-gray-400 border border-gray-200 line-through'
-                    }`}
-                  >
+                  <span key={idx} className={`px-2.5 py-1 rounded-full text-[10px] font-medium ${isActive ? 'bg-orange-100 text-orange-700 border border-orange-300' : 'bg-gray-100 text-gray-400 border border-gray-200 line-through'}`}>
                     {v}
                   </span>
                 );
@@ -409,41 +406,43 @@ export default function SentHistoryPage() {
             <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
               <i className="fas fa-eye text-orange-500"></i> Sample Message
             </h3>
-            <div
-              className="bg-white p-3 rounded-lg border text-sm text-gray-700 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: generateSampleMessage(selectedCampaign) }}
-            />
+            <div className="bg-white p-3 rounded-lg border text-sm text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: generateSampleMessage(selectedCampaign) }} />
           </div>
 
           {/* Action Buttons */}
           <div className="flex justify-between pt-3 border-t">
-            <button
-              onClick={openInCampaignBuilder}
-              className="text-orange-600 border border-orange-200 px-4 py-2 rounded-lg text-xs font-medium hover:bg-orange-50 transition flex items-center gap-2"
-            >
+            <button onClick={openInCampaignBuilder} className="text-orange-600 border border-orange-200 px-4 py-2 rounded-lg text-xs font-medium hover:bg-orange-50 transition flex items-center gap-2">
               <i className="fas fa-external-link-alt"></i> Open in Campaign Builder
             </button>
             <div className="flex gap-2">
               <Button variant="outline" onClick={closeEditModal}>Cancel</Button>
-              <Button variant="primary" icon="paper-plane" onClick={applyAndResend}>
-                Resend with New Settings
-              </Button>
+              <Button variant="primary" icon="paper-plane" onClick={applyAndResend}>Resend with New Settings</Button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* Delete Confirmation Modal */}
-  {/* Delete Confirmation Modal */}
-<Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete Campaign?">
-  <p className="text-sm text-gray-500 mt-2">
-    This will permanently delete the campaign and all associated QR images from Cloudinary. This action cannot be undone.
-  </p>
-  <div className="flex justify-end gap-2 mt-5">
-    <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>
-    <Button variant="danger" onClick={confirmDelete}>Delete</Button>
-  </div>
-</Modal>
+      {/* Delete Confirmation (single) */}
+      <Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete Campaign?">
+        <p className="text-sm text-gray-500 mt-2">This will permanently delete the campaign and all associated QR images from Cloudinary. This action cannot be undone.</p>
+        <div className="flex justify-end gap-2 mt-5">
+          <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>
+          <Button variant="danger" onClick={confirmDelete}>Delete</Button>
+        </div>
+      </Modal>
+
+      {/* Delete ALL Confirmation */}
+      <Modal isOpen={deleteAllModalOpen} onClose={() => setDeleteAllModalOpen(false)} title="Delete ALL Campaigns?">
+        <p className="text-sm text-gray-500 mt-2">
+          This will permanently delete <strong>all campaigns</strong> and all associated QR images from Cloudinary.
+          This action is <span className="text-red-600 font-bold">irreversible</span> and cannot be undone.
+        </p>
+        <p className="text-xs text-gray-400 mt-2">{totalCount} campaign(s) will be deleted.</p>
+        <div className="flex justify-end gap-2 mt-5">
+          <Button variant="outline" onClick={() => setDeleteAllModalOpen(false)}>Cancel</Button>
+          <Button variant="danger" onClick={confirmDeleteAll}>Delete All</Button>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -456,12 +455,10 @@ function StatsCard({ label, value, color = 'gray' }) {
     orange: 'bg-orange-50 border-orange-200 text-orange-700',
     gray: 'bg-white border-gray-200 text-gray-800',
   };
-  return (
-    <div className={`rounded-xl border p-4 text-center ${colorClasses[color] || colorClasses.gray}`}>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-2xl font-bold">{value}</p>
-    </div>
-  );
+  return <div className={`rounded-xl border p-4 text-center ${colorClasses[color] || colorClasses.gray}`}>
+    <p className="text-xs text-gray-500">{label}</p>
+    <p className="text-2xl font-bold">{value}</p>
+  </div>;
 }
 
 function StatBox({ label, value, color = 'gray' }) {
@@ -471,17 +468,13 @@ function StatBox({ label, value, color = 'gray' }) {
     amber: 'bg-amber-50 text-amber-700',
     gray: 'bg-gray-50 text-gray-800',
   };
-  return (
-    <div className={`rounded-lg p-3 text-center ${colorMap[color] || colorMap.gray}`}>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-xl font-bold">{value}</p>
-    </div>
-  );
+  return <div className={`rounded-lg p-3 text-center ${colorMap[color] || colorMap.gray}`}>
+    <p className="text-xs text-gray-500">{label}</p>
+    <p className="text-xl font-bold">{value}</p>
+  </div>;
 }
 
-// Sample message helper
 function generateSampleMessage(campaign) {
-  const variant = campaign.variants?.[0] || 'Default';
   if (campaign.templateKey === 'tpl1') {
     return `<p>Hello <strong>John Doe</strong> <i class="fas fa-hand-sparkles text-orange-500"></i><br><br>Here is your entry pass for "<strong>${campaign.name?.replace(' Passes', '') || campaign.name}</strong>".<br><br>Please present your QR code at the gate.<br><br>See you there!</p>`;
   }

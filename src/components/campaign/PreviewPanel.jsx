@@ -1,4 +1,3 @@
-// src/components/campaign/PreviewPanel.jsx
 import PhonePreview from '../common/PhonePreview';
 
 export default function PreviewPanel({
@@ -35,7 +34,7 @@ export default function PreviewPanel({
         name={recipientData?.name}
         phone={recipientData?.phone}
         message={messageText}
-        isHtml={true} // 🌟 Added: Flags that message content requires HTML rendering support
+        isHtml={true}
         qrUrl={qrUrl}
         showQR={showQR}
       />

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import Button from '../components/common/Button';
-import Modal from '../components/common/Modal';
 import ToggleSwitch from '../components/common/ToggleSwitch';
 import { useToast } from '../components/layout/Toast';
 import { getSettings, updateSettings } from '../services/settingsService';
@@ -10,7 +9,6 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('api');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
   const showToast = useToast();
 
   // ─── Full settings state (matches backend model) ─────────────
@@ -33,12 +31,6 @@ export default function SettingsPage() {
       deliveryDelay: 0,
       retryAttempts: 3,
     },
-    notificationPrefs: {
-      campaignCompleted: true,
-      deliveryFailures: true,
-      weeklySummary: false,
-      email: '',
-    },
   });
 
   // ─── Fetch settings from backend ────────────────────────────
@@ -54,7 +46,6 @@ export default function SettingsPage() {
           apiCredentials: { ...prev.apiCredentials, ...(data.apiCredentials || {}) },
           businessProfile: { ...prev.businessProfile, ...(data.businessProfile || {}) },
           messageDefaults: { ...prev.messageDefaults, ...(data.messageDefaults || {}) },
-          notificationPrefs: { ...prev.notificationPrefs, ...(data.notificationPrefs || {}) },
         }));
       } catch (err) {
         showToast('error', 'Failed to load settings', err.message);
@@ -93,11 +84,6 @@ export default function SettingsPage() {
     showToast('success', 'Copied', 'Webhook URL copied.');
   };
 
-  const sendInvite = () => {
-    setShowInviteModal(false);
-    showToast('success', 'Invite Sent', 'Invitation email dispatched.');
-  };
-
   // ─── Cloudinary storage cleanup ─────────────────────────────
   const clearStorage = async () => {
     if (!window.confirm('Delete all QR images from Cloudinary? This cannot be undone.')) return;
@@ -129,14 +115,21 @@ export default function SettingsPage() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 gap-6 text-sm overflow-x-auto">
-          <button onClick={() => setActiveTab('api')} className={`pb-2 px-1 whitespace-nowrap ${activeTab === 'api' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>🔑 API</button>
-          <button onClick={() => setActiveTab('profile')} className={`pb-2 px-1 whitespace-nowrap ${activeTab === 'profile' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>🏢 Profile</button>
-          <button onClick={() => setActiveTab('defaults')} className={`pb-2 px-1 whitespace-nowrap ${activeTab === 'defaults' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>💬 Defaults</button>
-          <button onClick={() => setActiveTab('team')} className={`pb-2 px-1 whitespace-nowrap ${activeTab === 'team' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>👥 Team</button>
-          <button onClick={() => setActiveTab('billing')} className={`pb-2 px-1 whitespace-nowrap ${activeTab === 'billing' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>💳 Billing</button>
-          <button onClick={() => setActiveTab('notifications')} className={`pb-2 px-1 whitespace-nowrap ${activeTab === 'notifications' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>🔔 Alerts</button>
-          <button onClick={() => setActiveTab('storage')} className={`pb-2 px-1 whitespace-nowrap ${activeTab === 'storage' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>🗑️ Storage</button>
-          <button onClick={() => setActiveTab('danger')} className={`pb-2 px-1 whitespace-nowrap text-red-500`}>⚠️ Danger</button>
+          <button onClick={() => setActiveTab('api')} className={`pb-2 px-1 flex items-center gap-2 whitespace-nowrap ${activeTab === 'api' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>
+            <i className="fas fa-key"></i> API
+          </button>
+          <button onClick={() => setActiveTab('profile')} className={`pb-2 px-1 flex items-center gap-2 whitespace-nowrap ${activeTab === 'profile' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>
+            <i className="fas fa-building"></i> Profile
+          </button>
+          <button onClick={() => setActiveTab('defaults')} className={`pb-2 px-1 flex items-center gap-2 whitespace-nowrap ${activeTab === 'defaults' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>
+            <i className="fas fa-comment-dots"></i> Defaults
+          </button>
+          <button onClick={() => setActiveTab('storage')} className={`pb-2 px-1 flex items-center gap-2 whitespace-nowrap ${activeTab === 'storage' ? 'border-b-2 border-orange-600 text-orange-600 font-semibold' : 'text-gray-500'}`}>
+            <i className="fas fa-trash-alt"></i> Storage
+          </button>
+          <button onClick={() => setActiveTab('danger')} className={`pb-2 px-1 flex items-center gap-2 whitespace-nowrap text-red-500`}>
+            <i className="fas fa-exclamation-triangle"></i> Danger
+          </button>
         </div>
 
         {/* ─── API Tab ─────────────────────────────────────────────── */}
@@ -231,61 +224,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* ─── Team Tab ──────────────────────────────────────────── */}
-        {activeTab === 'team' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="font-bold text-gray-700">Team Members</h2>
-              <Button onClick={() => setShowInviteModal(true)} icon="user-plus">Invite</Button>
-            </div>
-            <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-              <div><p className="text-sm font-medium">Emeka Okafor</p><p className="text-[10px] text-gray-400">Admin</p></div>
-              <select className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"><option>Admin</option></select>
-            </div>
-            <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-              <div><p className="text-sm font-medium">Chioma Adeyemi</p><p className="text-[10px] text-gray-400">Operator</p></div>
-              <select className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"><option>Operator</option></select>
-            </div>
-          </div>
-        )}
-
-        {/* ─── Billing Tab ───────────────────────────────────────── */}
-        {activeTab === 'billing' && (
-          <div className="space-y-5">
-            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-              <h2 className="font-bold text-gray-700">Current Plan</h2>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-2 flex justify-between items-center">
-                <div><p className="font-bold text-blue-800">Pro Plan</p><p className="text-xs text-blue-600">5,000 conversations/month</p></div>
-                <Button>Upgrade</Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ─── Notifications Tab ──────────────────────────────────── */}
-        {activeTab === 'notifications' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-gray-700">Notification Preferences</h2>
-            <div className="flex items-center justify-between">
-              <span className="text-xs">Campaign Completed</span>
-              <ToggleSwitch checked={settings.notificationPrefs.campaignCompleted} onChange={(checked) => updateNested('notificationPrefs', 'campaignCompleted', checked)} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs">Delivery Failures</span>
-              <ToggleSwitch checked={settings.notificationPrefs.deliveryFailures} onChange={(checked) => updateNested('notificationPrefs', 'deliveryFailures', checked)} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs">Weekly Summary</span>
-              <ToggleSwitch checked={settings.notificationPrefs.weeklySummary} onChange={(checked) => updateNested('notificationPrefs', 'weeklySummary', checked)} />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Notification Email</label>
-              <input type="email" value={settings.notificationPrefs.email} onChange={(e) => updateNested('notificationPrefs', 'email', e.target.value)} className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm" />
-            </div>
-            <Button onClick={() => handleSave('Notifications')} icon="save" disabled={saving}>{saving ? 'Saving…' : 'Save Preferences'}</Button>
-          </div>
-        )}
-
         {/* ─── Storage Tab ────────────────────────────────────────── */}
         {activeTab === 'storage' && (
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
@@ -314,26 +252,6 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
-
-      {/* Invite Member Modal */}
-      <Modal isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} title="Invite Team Member">
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-gray-500">Email</label>
-            <input type="email" className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm" placeholder="colleague@example.com" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500">Role</label>
-            <select className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm">
-              <option>Operator</option><option>Admin</option><option>Viewer</option>
-            </select>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowInviteModal(false)}>Cancel</Button>
-            <Button onClick={sendInvite}>Send Invite</Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

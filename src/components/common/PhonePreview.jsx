@@ -5,7 +5,10 @@ export default function PhonePreview({ name, phone, message, qrUrl, showQR = tru
       <div className="wa-chat-header">
         <i className="fas fa-arrow-left text-[10px]"></i>
         <div className="w-7 h-7 rounded-full bg-gray-300 overflow-hidden flex-shrink-0">
-          <img src={`https://ui-avatars.com/api/?name=EP&background=075e54&color=fff&size=28`} alt="avatar" />
+          <img
+            src={`https://ui-avatars.com/api/?name=EP&background=075e54&color=fff&size=28`}
+            alt="avatar"
+          />
         </div>
         <div className="leading-tight min-w-0">
           <div className="font-semibold text-[11px] truncate">EventPass</div>
@@ -13,16 +16,12 @@ export default function PhonePreview({ name, phone, message, qrUrl, showQR = tru
         </div>
       </div>
 
-      {/* Scrollable message area */}
+      {/* ─── Scrollable message area ───────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-2 py-1.5">
         <div className="wa-bubble-out">
-          <div
-            className="leading-relaxed text-[12px] break-words ql-snow ql-editor !p-0"
-            /* 🌟 Added fallback string check to avoid empty container runtime exceptions */
-            dangerouslySetInnerHTML={{ __html: message || '<p className="text-gray-300">Type your variant body message...</p>' }}
-          ></div>
+          {/* ✅ QR code at the top (like WhatsApp media) */}
           {showQR && (
-            <div className="mt-2 bg-white p-1.5 rounded border border-gray-200 text-center">
+            <div className="mb-2 bg-white p-1.5 rounded border border-gray-200 text-center">
               <img
                 src={qrUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=Sample'}
                 alt="QR"
@@ -31,6 +30,16 @@ export default function PhonePreview({ name, phone, message, qrUrl, showQR = tru
               <div className="text-[9px] text-gray-400 mt-0.5 truncate">qr_pass.png</div>
             </div>
           )}
+
+          {/* Message text below the QR */}
+          <div
+            className="leading-relaxed text-[12px] break-words ql-snow ql-editor !p-0"
+            dangerouslySetInnerHTML={{
+              __html: message || '<p className="text-gray-300">Type your variant body message...</p>',
+            }}
+          />
+
+          {/* Timestamp */}
           <div className="text-right text-[9px] text-gray-400 mt-1.5">
             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{' '}
             <i className="fas fa-check-double text-blue-400"></i>
@@ -38,7 +47,7 @@ export default function PhonePreview({ name, phone, message, qrUrl, showQR = tru
         </div>
       </div>
 
-      {/* Bottom input bar */}
+      {/* ─── Bottom input bar ───────────────────────────────────── */}
       <div className="flex-shrink-0 bg-[#f0f0f0] p-1.5 flex items-center gap-1.5">
         <i className="far fa-smile text-gray-400 text-sm pl-1"></i>
         <div className="bg-white rounded-full flex-1 h-7 px-2 flex items-center text-[10px] text-gray-300">

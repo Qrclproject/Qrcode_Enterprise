@@ -18,6 +18,7 @@ export const getCampaignById = (id) =>
 // Retry failed recipients for a campaign
 export const retryFailedMessages = (campaignId) =>
   api.post(`/campaigns/${campaignId}/retry`);
+
 // Trigger QR generation for a campaign
 export const generateCampaignQRs = (campaignId) =>
   api.post(`/campaigns/${campaignId}/generate-qrs`);
@@ -26,7 +27,10 @@ export const generateCampaignQRs = (campaignId) =>
 export const getCampaignQRProgress = (campaignId) =>
   api.get(`/campaigns/${campaignId}/qr-progress`);
 
-
-// Delete a campaign
+// Delete a single campaign
 export const deleteCampaign = (id) =>
   api.delete(`/campaigns/${id}`);
+
+// ✅ Delete ALL campaigns for the current user (clears history)
+export const deleteAllCampaigns = () =>
+  api.delete('/campaigns');
