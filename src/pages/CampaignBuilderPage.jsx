@@ -23,6 +23,7 @@ import { getDesigns } from '../services/designService';
 const staticFallback = [
   {
     id: 'tpl1', name: 'Entry Pass Delivery', showQR: true,
+    buttonType: 'none', buttonText: '', buttonValue: '',
     variants: [
       { label: 'Friendly', body: 'Hi {{1}} 👋\n\nYour QR code for {{2}} is ready!\n\nDate: {{3}}. Just show this at the door and you\'re in!\n\nSee you there!', active: true },
       { label: 'Formal', body: 'Dear {{1}},\n\nPlease find your official entry pass for {{2}} on {{3}}.\n\nPresent the QR code below at the entrance. We look forward to welcoming you.', active: true },
@@ -31,6 +32,7 @@ const staticFallback = [
   },
   {
     id: 'tpl2', name: 'Event Day Reminder', showQR: true,
+    buttonType: 'none', buttonText: '', buttonValue: '',
     variants: [
       { label: 'Enthusiastic', body: '🎉 It\'s almost time, {{1}}!\n\n{{2}} kicks off today at {{4}}.\n📍 Venue: {{5}}\n\nQR code attached – show it at the gate!', active: true },
       { label: 'Calm', body: 'Just a gentle reminder, {{1}} — {{2}} is today at {{4}}.\n\nWe\'re at {{5}}. Your QR pass is attached for easy entry.', active: true },
@@ -39,6 +41,7 @@ const staticFallback = [
   },
   {
     id: 'tpl3', name: 'Post-Event Thanks', showQR: false,
+    buttonType: 'none', buttonText: '', buttonValue: '',
     variants: [
       { label: 'Warm', body: 'Thank you for joining us at {{2}}, {{1}}! 🎉\n\nWe loved having you. Please share your thoughts: {{6}}\n\nSee you at the next event!', active: true },
       { label: 'Professional', body: 'Dear {{1}},\n\nThank you for attending {{2}}. We value your feedback — please complete our short survey: {{6}}\n\nBest regards, EventPass Team', active: true },
@@ -47,10 +50,10 @@ const staticFallback = [
   },
   {
     id: 'tpl4', name: 'Custom Message', showQR: true,
+    buttonType: 'none', buttonText: '', buttonValue: '',
     variants: [{ label: 'Custom', body: '', active: true }],
   },
 ];
-
 // ─── Sub‑component: Modal Design Preview with QR Overlay ────────
 function ModalDesignPreview({ design, isSelected, onSelect }) {
   const [dims, setDims] = useState({
@@ -183,13 +186,17 @@ export default function CampaignBuilderPage() {
         const av = {};
         apiTemplates.forEach(t => {
           list.push({ id: t._id, name: t.name });
-          defs[t._id] = {
-            name: t.name,
-            showQR: t.showQR ?? true,
-            variants: (t.variants || []).length > 0
-              ? t.variants.map(v => ({ label: v.label, body: v.body, active: v.active !== false }))
-              : [{ label: 'Default', body: 'Hi {{1}}, your pass for {{2}} on {{3}} is ready.', active: true }],
-          };
+    defs[t._id] = {
+  name: t.name,
+  showQR: t.showQR ?? true,
+  variants: (t.variants || []).length > 0
+    ? t.variants.map(v => ({ label: v.label, body: v.body, active: v.active !== false }))
+    : [{ label: 'Default', body: 'Hi {{1}}, your pass for {{2}} on {{3}} is ready.', active: true }],
+  // 👇 Add CTA button fields
+  buttonType: t.buttonType || 'none',
+  buttonText: t.buttonText || '',
+  buttonValue: t.buttonValue || '',
+};
           const activeIndices = (t.variants || []).map((v, i) => (v.active !== false ? i : -1)).filter(i => i >= 0);
           av[t._id] = activeIndices.length > 0 ? activeIndices : [0];
         });
@@ -806,18 +813,22 @@ export default function CampaignBuilderPage() {
           customMessage={customMessage}
           setCustomMessage={setCustomMessage}
         />
-        <PreviewPanel
-          recipientData={{ name: currentRecipient[mapping.placeholders?.[1]] || '', phone: mappedPhone }}
-          messageText={messagePreview}
-          qrUrl={generateQr ? mappedQrUrl : ''}
-          showQR={generateQr && tplDef.showQR !== false}
-          currentIndex={previewRecipientIndex + 1}
-          total={total}
-          onPrev={prevRecipient}
-          onNext={nextRecipient}
-          variantLabel={currentVariant?.label}
-          onCycleVariant={cycleVariant}
-        />
+    <PreviewPanel
+  recipientData={{ name: currentRecipient[mapping.placeholders?.[1]] || '', phone: mappedPhone }}
+  messageText={messagePreview}
+  qrUrl={generateQr ? mappedQrUrl : ''}
+  showQR={generateQr && tplDef.showQR !== false}
+  currentIndex={previewRecipientIndex + 1}
+  total={total}
+  onPrev={prevRecipient}
+  onNext={nextRecipient}
+  variantLabel={currentVariant?.label}
+  onCycleVariant={cycleVariant}
+  // ─── CTA button props ──────────────────────────────────────────
+  buttonType={tplDef?.buttonType}
+  buttonText={tplDef?.buttonText}
+  buttonValue={tplDef?.buttonValue}
+/>
         <SettingsPanel
           batchSize={batchSize}
           setBatchSize={setBatchSize}

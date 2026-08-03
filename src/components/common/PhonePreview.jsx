@@ -1,4 +1,46 @@
-export default function PhonePreview({ name, phone, message, qrUrl, showQR = true }) {
+export default function PhonePreview({
+  name,
+  phone,
+  message,
+  qrUrl,
+  showQR = true,
+  buttonType,
+  buttonText,
+  buttonValue,
+}) {
+  // ─── Render CTA button (if present) ────────────────────────────
+  const renderButton = () => {
+    if (!buttonType || buttonType === 'none') return null;
+
+    let icon = 'fas fa-phone';
+    let label = buttonText || (buttonType === 'phone_number' ? 'Call' : 'Visit');
+    let href = '';
+    let target = '';
+
+    if (buttonType === 'phone_number') {
+      href = `tel:${buttonValue}`;
+      icon = 'fas fa-phone';
+    } else if (buttonType === 'url') {
+      href = buttonValue;
+      icon = 'fas fa-external-link-alt';
+      target = '_blank';
+    }
+
+    return (
+      <div className="mt-2 text-center">
+        <a
+          href={href}
+          target={target}
+          rel={target === '_blank' ? 'noopener noreferrer' : undefined}
+          className="inline-flex items-center gap-1.5 bg-green-500 text-white text-xs font-semibold px-4 py-2 rounded-full hover:bg-green-600 transition"
+          style={{ backgroundColor: '#25D366' }}
+        >
+          <i className={icon}></i> {label}
+        </a>
+      </div>
+    );
+  };
+
   return (
     <div className="phone-frame flex flex-col">
       <div className="phone-notch-bar"></div>
@@ -19,7 +61,7 @@ export default function PhonePreview({ name, phone, message, qrUrl, showQR = tru
       {/* ─── Scrollable message area ───────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-2 py-1.5">
         <div className="wa-bubble-out">
-          {/* ✅ QR code at the top (like WhatsApp media) */}
+          {/* QR code at the top (like WhatsApp media) */}
           {showQR && (
             <div className="mb-2 bg-white p-1.5 rounded border border-gray-200 text-center">
               <img
@@ -31,13 +73,16 @@ export default function PhonePreview({ name, phone, message, qrUrl, showQR = tru
             </div>
           )}
 
-          {/* Message text below the QR */}
+          {/* Message text */}
           <div
             className="leading-relaxed text-[12px] break-words ql-snow ql-editor !p-0"
             dangerouslySetInnerHTML={{
               __html: message || '<p className="text-gray-300">Type your variant body message...</p>',
             }}
           />
+
+          {/* ─── CTA Button ───────────────────────────────────────── */}
+          {renderButton()}
 
           {/* Timestamp */}
           <div className="text-right text-[9px] text-gray-400 mt-1.5">

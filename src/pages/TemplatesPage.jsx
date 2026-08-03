@@ -75,23 +75,45 @@ export default function TemplatesPage() {
     }
   };
 
-  // Create or update template with whatsappTemplateName
-  const handleFormSave = async ({ name, whatsappTemplateName, category, showQR }) => {
+  // ─── Edit template properties (gear icon) ──────────────────────
+  const handleEditProperties = (template) => {
+    setSelectedTemplate(template);
+    setShowForm(true);
+  };
+
+  // ─── Create new template ──────────────────────────────────────
+  const handleNewTemplate = () => {
+    setSelectedTemplate(null);
+    setShowForm(true);
+  };
+
+  // ─── Save form (create or update) ─────────────────────────────
+  const handleFormSave = async ({
+    name,
+    whatsappTemplateName,
+    category,
+    showQR,
+    buttonType,
+    buttonText,
+    buttonValue,
+  }) => {
     try {
+      const data = {
+        name,
+        whatsappTemplateName,
+        category,
+        showQR,
+        buttonType,
+        buttonText,
+        buttonValue,
+      };
+
       if (selectedTemplate) {
-        await updateTemplate(selectedTemplate._id, {
-          name,
-          whatsappTemplateName,
-          category,
-          showQR,
-        });
+        await updateTemplate(selectedTemplate._id, data);
         showToast('success', 'Updated', `Template "${name}" updated.`);
       } else {
         await createTemplate({
-          name,
-          whatsappTemplateName,
-          category,
-          showQR,
+          ...data,
           variants: [
             {
               label: 'Default',
@@ -107,15 +129,16 @@ export default function TemplatesPage() {
       showToast('error', 'Save failed', err.response?.data?.message || err.message);
     }
     setShowForm(false);
+    setSelectedTemplate(null);
   };
 
-  // Open variant editor for a template
+  // ─── Open variant editor (pencil icon) ──────────────────────
   const handleEditVariants = (template) => {
     setSelectedTemplate(template);
     setShowVariantEditor(true);
   };
 
-  // Save variants to the backend
+  // ─── Save variants ─────────────────────────────────────────────
   const handleSaveVariants = async (variants) => {
     try {
       await updateTemplate(selectedTemplate._id, { variants });
@@ -127,7 +150,7 @@ export default function TemplatesPage() {
     setShowVariantEditor(false);
   };
 
-  // Clone a template via API
+  // ─── Clone a template ──────────────────────────────────────────
   const handleClone = async (id) => {
     try {
       await cloneTemplate(id);
@@ -138,7 +161,7 @@ export default function TemplatesPage() {
     }
   };
 
-  // Delete a single template
+  // ─── Delete a single template ─────────────────────────────────
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
@@ -198,13 +221,7 @@ export default function TemplatesPage() {
                 <i className="fas fa-list mr-1"></i>List
               </button>
             </div>
-            <Button
-              icon="plus"
-              onClick={() => {
-                setSelectedTemplate(null);
-                setShowForm(true);
-              }}
-            >
+            <Button icon="plus" onClick={handleNewTemplate}>
               New Template
             </Button>
           </div>
@@ -249,6 +266,7 @@ export default function TemplatesPage() {
               key={tpl._id || tpl.id}
               template={tpl}
               onEdit={() => handleEditVariants(tpl)}
+              onEditProperties={handleEditProperties}  // 👈 new gear icon
               onClone={handleClone}
               onDelete={(id) => setDeleteId(id)}
               selected={selectedIds.has(tpl._id)}
@@ -263,15 +281,15 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      {/* Template Form Modal */}
+      {/* Template Form Modal (metadata + CTA) */}
       <TemplateForm
         isOpen={showForm}
-        onClose={() => setShowForm(false)}
+        onClose={() => { setShowForm(false); setSelectedTemplate(null); }}
         onSave={handleFormSave}
         initialData={selectedTemplate}
       />
 
-      {/* Variant Editor Modal – now passes templateName and whatsappTemplateName */}
+      {/* Variant Editor Modal */}
       <Modal
         isOpen={showVariantEditor}
         onClose={() => setShowVariantEditor(false)}

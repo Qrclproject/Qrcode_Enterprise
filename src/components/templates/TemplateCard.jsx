@@ -1,13 +1,17 @@
 import { categoryColor, categoryIcon, categoryEmoji } from '../../utils/constants';
 
-export default function TemplateCard({ template, onEdit, onClone, onDelete, selected, onSelect }) {
+export default function TemplateCard({ template, onEdit, onClone, onDelete, selected, onSelect, onEditProperties }) {
   const variantCount = template.variants?.length || 1;
   const activeCount = template.variants?.filter(v => v.active).length || 1;
   const templateId = template._id || template.id;
 
+  const buttonLabel = {
+    phone_number: '📞 Call',
+    url: '🔗 URL',
+  }[template.buttonType] || null;
+
   return (
     <div className="relative bg-white rounded-xl border border-gray-200 p-4 template-card flex flex-col">
-      {/* Multi‑select checkbox */}
       {onSelect && (
         <div className="absolute top-2 left-2 z-10">
           <input
@@ -24,9 +28,24 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
           <i className={`fas fa-${categoryIcon(template.category)} text-${categoryColor(template.category)}-600`}></i>
         </div>
         <div className="flex gap-1">
-          <button onClick={() => onEdit(templateId)} className="text-gray-400 hover:text-blue-600 p-1" title="Edit">
+          {/* ─── Edit Variants (pencil) ──────────────────────────── */}
+          <button
+            onClick={() => onEdit(templateId)}
+            className="text-gray-400 hover:text-blue-600 p-1"
+            title="Edit Variants"
+          >
             <i className="fas fa-edit"></i>
           </button>
+          {/* ─── Edit Properties (gear) ──────────────────────────── */}
+          {onEditProperties && (
+            <button
+              onClick={() => onEditProperties(template)}
+              className="text-gray-400 hover:text-gray-700 p-1"
+              title="Edit Template Properties"
+            >
+              <i className="fas fa-cog"></i>
+            </button>
+          )}
           <button onClick={() => onClone(templateId)} className="text-gray-400 hover:text-green-600 p-1" title="Clone">
             <i className="fas fa-clone"></i>
           </button>
@@ -36,14 +55,17 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
         </div>
       </div>
 
-      {/* Internal name */}
       <h3 className="font-bold text-gray-800">{template.name}</h3>
-
-      {/* WhatsApp template name (if present) */}
       {template.whatsappTemplateName && (
         <p className="text-[10px] text-gray-400 mt-0.5 truncate">
           <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">WhatsApp: {template.whatsappTemplateName}</span>
         </p>
+      )}
+
+      {buttonLabel && (
+        <span className="inline-block mt-1 text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+          {buttonLabel}
+        </span>
       )}
 
       <div className="flex flex-wrap gap-1 mt-1.5">
