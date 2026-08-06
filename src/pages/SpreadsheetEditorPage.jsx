@@ -7,7 +7,9 @@ export default function SpreadsheetEditorPage() {
   const [data, setData] = useState([]);
   const [columns, setColumns] = useState([]);
   const [fileName, setFileName] = useState('');
-  const [restoreState, setRestoreState] = useState(null); // 👈 new
+  const [restoreState, setRestoreState] = useState(null);
+  // ─── Fill values per column ──────────────────────────────────
+  const [fillValues, setFillValues] = useState({});
 
   useEffect(() => {
     const state = location.state;
@@ -16,12 +18,10 @@ export default function SpreadsheetEditorPage() {
       const parsed = state.parsedData;
       setColumns(Object.keys(parsed[0] || {}));
       setData(parsed);
-      // Capture restoreState if provided
       if (state.restoreState) {
         setRestoreState(state.restoreState);
       }
     } else {
-      // No data – redirect back
       navigate('/', { replace: true });
     }
   }, [location, navigate]);
@@ -84,21 +84,29 @@ export default function SpreadsheetEditorPage() {
     setData(updated);
   };
 
+  // ─── Fill a column with a value ────────────────────────────────
+  const fillColumn = (col, value) => {
+    if (!col || !value.trim()) return;
+    const updated = data.map(row => ({ ...row, [col]: value.trim() }));
+    setData(updated);
+    // Clear the fill input for this column
+    setFillValues(prev => ({ ...prev, [col]: '' }));
+  };
+
   // ─── Save and go to Campaign Builder ──────────────────────────
   const handleSave = () => {
-    // Pass back the updated data and the restoreState (if any)
-    navigate('/', { 
-      state: { 
-        spreadsheetData: data, 
+    navigate('/', {
+      state: {
+        spreadsheetData: data,
         fileName,
-        restoreState, // 👈 send it back so campaign page can restore settings
-      } 
+        restoreState,
+      }
     });
   };
 
   // ─── Cancel – go back without saving ─────────────────────────
   const handleCancel = () => {
-    navigate(-1); // go back to previous page (campaign builder)
+    navigate(-1);
   };
 
   return (
@@ -127,14 +135,14 @@ export default function SpreadsheetEditorPage() {
               + Add Column
             </button>
             <div className="flex gap-2">
-              <button 
-                onClick={handleCancel} 
+              <button
+                onClick={handleCancel}
                 className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50"
               >
                 Cancel
               </button>
-              <button 
-                onClick={handleSave} 
+              <button
+                onClick={handleSave}
                 className="bg-orange-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-orange-600"
               >
                 Save & Continue
@@ -146,6 +154,7 @@ export default function SpreadsheetEditorPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
           <table className="min-w-full text-xs text-left">
             <thead className="bg-gray-50 border-b">
+              {/* ─── Row 1: Column names ─────────────────────────── */}
               <tr>
                 <th className="px-3 py-2 w-8">#</th>
                 {columns.map((col) => (
@@ -167,7 +176,43 @@ export default function SpreadsheetEditorPage() {
                 ))}
                 <th className="px-3 py-2 w-8">Actions</th>
               </tr>
+
+              {/* ─── Row 2: Auto‑fill inputs ────────────────────── */}
+              <tr className="bg-gray-50/80">
+                <td className="px-3 py-1 text-gray-400 text-[10px] font-medium text-center">
+                  <i className="fas fa-fill-drip"></i>
+                </td>
+                {columns.map((col) => (
+                  <td key={col} className="px-3 py-1">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={fillValues[col] || ''}
+                        onChange={(e) => setFillValues({ ...fillValues, [col]: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            fillColumn(col, fillValues[col] || '');
+                          }
+                        }}
+                        placeholder="Fill all rows"
+                        className="w-full border border-gray-200 rounded px-1 py-0.5 text-xs focus:border-blue-400 outline-none"
+                        title="Enter a value and press Enter to fill all rows in this column"
+                      />
+                      <button
+                        onClick={() => fillColumn(col, fillValues[col] || '')}
+                        className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded hover:bg-blue-600"
+                        title="Fill column with this value"
+                      >
+                        <i className="fas fa-arrow-right"></i>
+                      </button>
+                    </div>
+                  </td>
+                ))}
+                <td className="px-3 py-1"></td>
+              </tr>
             </thead>
+
             <tbody className="divide-y divide-gray-100">
               {data.map((row, rowIdx) => (
                 <tr key={rowIdx} className="hover:bg-gray-50">
@@ -196,6 +241,12 @@ export default function SpreadsheetEditorPage() {
             </tbody>
           </table>
         </div>
+
+        {data.length === 0 && (
+          <div className="text-center py-4 text-gray-400">
+            No rows to display. Click <strong>Add Row</strong> to start.
+          </div>
+        )}
       </div>
     </div>
   );
