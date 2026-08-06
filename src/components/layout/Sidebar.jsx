@@ -28,12 +28,13 @@ export default function Sidebar({ onCloseMobile }) {
 
   return (
     <aside className="w-60 h-full bg-white border-r border-gray-200 flex flex-col z-20 shadow-sm">
-      {/* Brand */}
-      <div className="h-16 flex items-center px-5 border-b border-gray-200 bg-white">
-        <div className="flex items-center gap-2.5 text-orange-600 font-bold text-lg tracking-wide">
-          <i className="fas fa-qrcode text-orange-500 text-2xl"></i>
-          <span>QRCODE.NG</span>
-        </div>
+      {/* ─── Brand: Logo only ──────────────────────────────────── */}
+      <div className="h-16 flex items-center justify-center px-5 border-b border-gray-200 bg-white">
+        <img 
+          src="/logo.png" 
+          alt="QRCODE.NG" 
+          className="h-19 w-auto object-contain" 
+        />
       </div>
 
       {/* Navigation */}
