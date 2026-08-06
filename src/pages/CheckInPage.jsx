@@ -156,24 +156,47 @@ export default function CheckInPage() {
           </p>
 
           {/* ─── Camera Scanner ───────────────────────────────────── */}
-          {scanning ? (
-            <div className="w-full max-w-sm mx-auto mb-4 bg-gray-100 rounded-lg overflow-hidden relative">
-              {cameraError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-red-50/80 z-10">
-                  <p className="text-sm text-red-600 text-center px-4">{cameraError}</p>
-                </div>
-              )}
-              <Scanner
-                onScan={handleScan}
-                onError={handleError}
-                constraints={{ facingMode: facingMode }}
-                styles={{
-                  container: { width: '100%', paddingBottom: '100%', position: 'relative' },
-                  video: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' },
-                }}
-              />
-            </div>
-          ) : (
+      {scanning ? (
+  <div className="w-full max-w-sm mx-auto mb-4 bg-gray-100 rounded-lg overflow-hidden relative">
+    {cameraError && (
+      <div className="absolute inset-0 flex items-center justify-center bg-red-50/80 z-10">
+        <p className="text-sm text-red-600 text-center px-4">{cameraError}</p>
+      </div>
+    )}
+    <div className="relative w-full" style={{ paddingBottom: '100%' }}>
+      <Scanner
+        onScan={handleScan}
+        onError={handleError}
+        constraints={{ facingMode: facingMode }}
+        styles={{
+          container: {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          video: {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          },
+        }}
+      />
+      {/* ─── Optional scanning overlay ────────────────────────── */}
+      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+        <div className="w-3/4 h-3/4 border-2 border-orange-500 rounded-lg opacity-70"></div>
+        <div className="absolute w-8 h-1 bg-orange-500 animate-pulse rounded-full" style={{ top: '48%' }}></div>
+      </div>
+    </div>
+  </div>
+) :(
             <div className="text-center py-4">
               <button
                 onClick={resetScan}
