@@ -16,6 +16,7 @@ export default function CheckInPage() {
   const [loading, setLoading] = useState(false);
   const [attendee, setAttendee] = useState(null);
   const scannerRef = useRef(null);
+  const [facingMode, setFacingMode] = useState('environment');
 
   // ─── Auto‑process QR from URL parameter ──────────────────────
   useEffect(() => {
@@ -79,10 +80,9 @@ export default function CheckInPage() {
   };
 
   // ─── Switch camera (front/back) ─────────────────────────────
-  const [facingMode, setFacingMode] = useState('environment');
   const toggleCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
-    // Reset scanner state to restart with new camera
+    // Force restart scanner
     setScanning(false);
     setTimeout(() => setScanning(true), 100);
   };
@@ -127,10 +127,27 @@ export default function CheckInPage() {
                 ref={scannerRef}
                 onResult={handleScan}
                 onError={handleError}
-                constraints={{ facingMode }}
+                constraints={{
+                  facingMode: facingMode,
+                  // iOS prefers an aspect ratio hint
+                  aspectRatio: { ideal: 1 },
+                }}
                 className="w-full"
-                containerStyle={{ width: '100%', paddingBottom: '100%', position: 'relative' }}
-                videoStyle={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                containerStyle={{
+                  width: '100%',
+                  paddingBottom: '100%',
+                  position: 'relative',
+                  backgroundColor: '#f3f4f6',
+                }}
+                // ─── iOS‑critical video style ─────────────────
+                videoStyle={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover', // ✅ Fixes iOS blank screen
+                }}
               />
             </div>
           ) : (
@@ -193,7 +210,7 @@ export default function CheckInPage() {
                 onChange={(e) => setManualInput(e.target.value)}
                 placeholder="Paste scanned QR string..."
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
-                autoFocus={!scanning} // focus when camera is off
+                autoFocus={!scanning}
               />
               <button
                 type="submit"
