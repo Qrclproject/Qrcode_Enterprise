@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './store/AppProvider';
 import { AuthProvider } from './store/AuthContext';
 import Sidebar from './components/layout/Sidebar';
@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import CampaignBuilderPage from './pages/CampaignBuilderPage';
 import SentHistoryPage from './pages/SentHistoryPage';
+import NoAccessPage from './pages/NoAccessPage';
 import TemplatesPage from './pages/TemplatesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -22,6 +23,7 @@ import CheckInSelectorPage from './pages/CheckInSelectorPage';
 import CheckInPage from './pages/CheckInPage';
 import CampaignDetailPage from './pages/CampaignDetailPage';
 import ScanHistoryPage from './pages/ScanHistoryPage';
+
 export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const toggleMobileMenu = () => setMobileMenuOpen((prev) => !prev);
@@ -31,13 +33,14 @@ export default function App() {
       <AppProvider>
         <BrowserRouter>
           <Routes>
-            {/* Auth pages – no sidebar/header */}
+            {/* ─── Public routes (no sidebar) ─────────────────────── */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/data-deletion" element={<DataDeletionPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
-            {/* App pages – with sidebar/header, protected */}
+
+            {/* ─── Protected routes (with sidebar + header) ──────── */}
             <Route
               path="/*"
               element={
@@ -59,18 +62,19 @@ export default function App() {
                     <main className="flex-1 flex flex-col h-screen overflow-hidden">
                       <Header onToggleMobileMenu={toggleMobileMenu} />
                       <Routes>
-                        <Route path="/spreadsheet-editor" element={<SpreadsheetEditorPage />} />
-                        <Route path="/templates/:templateId/variants/:variantIndex" element={<VariantEditPage />} />
                         <Route path="/" element={<CampaignBuilderPage />} />
                         <Route path="/history" element={<SentHistoryPage />} />
-                        <Route path="/campaigns/:campaignId" element={<ProtectedRoute><CampaignDetailPage /></ProtectedRoute>} />
-<Route path="/campaigns/:campaignId/scan-history" element={<ProtectedRoute><ScanHistoryPage /></ProtectedRoute>} />
-                        <Route path="/check-in" element={<ProtectedRoute><CheckInSelectorPage /></ProtectedRoute>} />
-<Route path="/check-in/:campaignId" element={<ProtectedRoute><CheckInPage /></ProtectedRoute>} />
                         <Route path="/templates" element={<TemplatesPage />} />
                         <Route path="/analytics" element={<AnalyticsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/designs" element={<DesignsPage />} />
+                        <Route path="/check-in" element={<CheckInSelectorPage />} />
+                        <Route path="/check-in/:campaignId" element={<CheckInPage />} />
+                        <Route path="/campaigns/:campaignId" element={<CampaignDetailPage />} />
+                        <Route path="/campaigns/:campaignId/scan-history" element={<ScanHistoryPage />} />
+                        <Route path="/spreadsheet-editor" element={<SpreadsheetEditorPage />} />
+                        <Route path="/templates/:templateId/variants/:variantIndex" element={<VariantEditPage />} />
+                        <Route path="/no-access" element={<NoAccessPage />} />
                       </Routes>
                     </main>
                   </div>

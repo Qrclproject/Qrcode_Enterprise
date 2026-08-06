@@ -54,6 +54,7 @@ const staticFallback = [
     variants: [{ label: 'Custom', body: '', active: true }],
   },
 ];
+
 // ─── Sub‑component: Modal Design Preview with QR Overlay ────────
 function ModalDesignPreview({ design, isSelected, onSelect }) {
   const [dims, setDims] = useState({
@@ -147,10 +148,16 @@ export default function CampaignBuilderPage() {
   const [templateDefs, setTemplateDefs] = useState({});
 
   const [campaignId, setCampaignId] = useState(null);
+  const [campaignName, setCampaignName] = useState(''); // 👈 store campaign name
   const [qrGenStatus, setQrGenStatus] = useState('pending');
   const [qrGenTotal, setQrGenTotal] = useState(0);
   const [qrGenProgress, setQrGenProgress] = useState(0);
   const pollingRef = useRef(null);
+
+  // ─── Name modal state ──────────────────────────────────────────
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [pendingData, setPendingData] = useState(null);
+  const [pendingMapping, setPendingMapping] = useState(null);
 
   // ─── Prevent duplicate processing ─────────────────────────────
   const processedRef = useRef('');
@@ -186,17 +193,16 @@ export default function CampaignBuilderPage() {
         const av = {};
         apiTemplates.forEach(t => {
           list.push({ id: t._id, name: t.name });
-    defs[t._id] = {
-  name: t.name,
-  showQR: t.showQR ?? true,
-  variants: (t.variants || []).length > 0
-    ? t.variants.map(v => ({ label: v.label, body: v.body, active: v.active !== false }))
-    : [{ label: 'Default', body: 'Hi {{1}}, your pass for {{2}} on {{3}} is ready.', active: true }],
-  // 👇 Add CTA button fields
-  buttonType: t.buttonType || 'none',
-  buttonText: t.buttonText || '',
-  buttonValue: t.buttonValue || '',
-};
+          defs[t._id] = {
+            name: t.name,
+            showQR: t.showQR ?? true,
+            variants: (t.variants || []).length > 0
+              ? t.variants.map(v => ({ label: v.label, body: v.body, active: v.active !== false }))
+              : [{ label: 'Default', body: 'Hi {{1}}, your pass for {{2}} on {{3}} is ready.', active: true }],
+            buttonType: t.buttonType || 'none',
+            buttonText: t.buttonText || '',
+            buttonValue: t.buttonValue || '',
+          };
           const activeIndices = (t.variants || []).map((v, i) => (v.active !== false ? i : -1)).filter(i => i >= 0);
           av[t._id] = activeIndices.length > 0 ? activeIndices : [0];
         });
@@ -342,7 +348,7 @@ export default function CampaignBuilderPage() {
   }, []);
 
   // ─── Process data from spreadsheet editor ─────────────────────
-  const processSpreadsheetData = useCallback(async (data, mappingObj) => {
+  const processSpreadsheetData = useCallback(async (data, mappingObj, name) => {
     if (!data || data.length === 0) return;
     if (generateQr && !designId) {
       showToast('warning', 'Design required', 'Please select a design or turn off QR generation.');
@@ -357,7 +363,7 @@ export default function CampaignBuilderPage() {
       });
 
       const campaignData = {
-        name: 'Campaign ' + new Date().toLocaleDateString(),
+        name: name || 'Campaign ' + new Date().toLocaleDateString(),
         templateKey: template,
         templateId: template,
         recipients,
@@ -378,6 +384,7 @@ export default function CampaignBuilderPage() {
       const newId = res.data?._id || res.data?.id;
       if (!newId) throw new Error('Failed to create campaign');
       setCampaignId(newId);
+      setCampaignName(name || '');
 
       if (generateQr && designId) {
         await generateCampaignQRs(newId);
@@ -405,6 +412,7 @@ export default function CampaignBuilderPage() {
     designId,
     generateQr,
     previewVariantIndex,
+    campaignName,
   });
 
   // ─── 1) Data loading effect: runs when spreadsheet data arrives ──
@@ -418,14 +426,13 @@ export default function CampaignBuilderPage() {
     if (restoreState?.mapping) {
       setMapping(restoreState.mapping);
     } else {
-      // Otherwise compute default mapping from columns
       const cols = Object.keys(data[0] || {});
       setColumns(cols);
       const newMapping = computeMapping(cols);
       setMapping(newMapping);
     }
 
-    // Set parsed data and columns (if not already set)
+    // Set parsed data and columns
     setParsedData(data);
     if (restoreState?.template) setTemplate(restoreState.template);
     if (restoreState?.batchSize) setBatchSize(restoreState.batchSize);
@@ -436,6 +443,7 @@ export default function CampaignBuilderPage() {
     if (restoreState?.designId !== undefined) setDesignId(restoreState.designId);
     if (restoreState?.generateQr !== undefined) setGenerateQr(restoreState.generateQr);
     if (restoreState?.previewVariantIndex !== undefined) setPreviewVariantIndex(restoreState.previewVariantIndex);
+    if (restoreState?.campaignName) setCampaignName(restoreState.campaignName);
 
     setPreviewRecipientIndex(0);
     const active = activeVariants[template] || [];
@@ -445,33 +453,51 @@ export default function CampaignBuilderPage() {
 
     window.history.replaceState({}, document.title);
 
-    // Call processSpreadsheetData with the current mapping (after state updates)
-    // We'll use the mapping that was just set – we need to read the current mapping value.
-    // Since we're in a useEffect, we can use a ref or just call after setState using a timeout.
-    // Better: store mapping in a ref to avoid stale closure.
-    // For simplicity, we'll use a setTimeout to ensure state updates are applied.
-    setTimeout(() => {
-      // Read the current mapping from state (we'll use a ref to avoid dependency)
-      // We'll create a ref for mapping later.
-      // For now, we'll use the mapping variable from the closure – but it may be stale.
-      // So we'll pass the newly computed mapping directly.
+    // If we already have a campaign name (from restore), process immediately
+    if (restoreState?.campaignName) {
       const finalMapping = restoreState?.mapping || computeMapping(Object.keys(data[0] || {}));
-      processSpreadsheetData(data, finalMapping);
-    }, 0);
-
-  }, [location.state?.spreadsheetData, location.state?.restoreState]); // Only data changes
+      processSpreadsheetData(data, finalMapping, restoreState.campaignName);
+    } else {
+      // Otherwise, show the name modal
+      setPendingData(data);
+      setPendingMapping(restoreState?.mapping || computeMapping(Object.keys(data[0] || {})));
+      setShowNameModal(true);
+    }
+  }, [location.state?.spreadsheetData, location.state?.restoreState]);
 
   // ─── 2) QR toggling effect: re‑runs campaign creation when QR state changes ──
   useEffect(() => {
-    if (!parsedData || !mapping.phone) return; // need data and mapping
-    // Avoid duplicate processing if QR state didn't actually change
+    if (!parsedData || !mapping.phone) return;
     const key = parsedData.length + '_' + generateQr + '_' + designId + '_' + template;
     if (processedRef.current === key) return;
     processedRef.current = key;
 
-    // Re‑process with current data and mapping (creates new campaign with QR settings)
-    processSpreadsheetData(parsedData, mapping);
-  }, [generateQr, designId, template, parsedData, mapping, processSpreadsheetData]);
+    // Use existing campaign name or a default
+    const name = campaignName || 'Campaign ' + new Date().toLocaleDateString();
+    processSpreadsheetData(parsedData, mapping, name);
+  }, [generateQr, designId, template, parsedData, mapping, processSpreadsheetData, campaignName]);
+
+  // ─── Campaign name modal handlers ─────────────────────────────
+  const handleNameSubmit = () => {
+    if (!campaignName.trim()) {
+      showToast('warning', 'Missing name', 'Please provide a campaign name.');
+      return;
+    }
+    setShowNameModal(false);
+    processSpreadsheetData(pendingData, pendingMapping, campaignName.trim());
+    setPendingData(null);
+    setPendingMapping(null);
+  };
+
+  const handleNameCancel = () => {
+    setShowNameModal(false);
+    setPendingData(null);
+    setPendingMapping(null);
+    // Reset the spreadsheet data so the user can re‑upload
+    setParsedData(null);
+    setColumns([]);
+    showToast('info', 'Cancelled', 'Campaign creation cancelled.');
+  };
 
   // ─── Load campaign from Sent History ───────────────────────────
   useEffect(() => {
@@ -505,6 +531,7 @@ export default function CampaignBuilderPage() {
     setActiveVariants(prev => ({ ...prev, [campaign.templateKey]: campaign.activeVariants || [0] }));
     setPreviewRecipientIndex(0);
     setPreviewVariantIndex((campaign.activeVariants || [0])[0] || 0);
+    setCampaignName(campaign.name || '');
     showToast('info', 'Campaign Loaded', `"${campaign.name}" is ready for editing.`);
   };
 
@@ -625,12 +652,16 @@ export default function CampaignBuilderPage() {
     setFailedRecipients([]);
     setCustomMessage('');
     setCampaignId(null);
+    setCampaignName('');
     setQrGenStatus('pending');
     setQrGenTotal(0);
     setQrGenProgress(0);
     setDesignId('');
     setGenerateQr(false);
     processedRef.current = '';
+    setShowNameModal(false);
+    setPendingData(null);
+    setPendingMapping(null);
   };
 
   // ─── Toggle QR generation ─────────────────────────────────────
@@ -797,6 +828,33 @@ export default function CampaignBuilderPage() {
         </div>
       </Modal>
 
+      {/* ─── CAMPAIGN NAME MODAL ─────────────────────────────────── */}
+      <Modal
+        isOpen={showNameModal}
+        onClose={handleNameCancel}
+        title="Name Your Campaign"
+        size="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Give your campaign a meaningful name so you can easily identify it later.
+          </p>
+          <input
+            type="text"
+            value={campaignName}
+            onChange={(e) => setCampaignName(e.target.value)}
+            placeholder="e.g., Summer Gala 2026, Tech Conference Check-In"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') handleNameSubmit(); }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={handleNameCancel}>Cancel</Button>
+            <Button variant="primary" onClick={handleNameSubmit}>Create Campaign</Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Main Builder panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <UploadPanel onReset={handleReset} />
@@ -813,22 +871,21 @@ export default function CampaignBuilderPage() {
           customMessage={customMessage}
           setCustomMessage={setCustomMessage}
         />
-    <PreviewPanel
-  recipientData={{ name: currentRecipient[mapping.placeholders?.[1]] || '', phone: mappedPhone }}
-  messageText={messagePreview}
-  qrUrl={generateQr ? mappedQrUrl : ''}
-  showQR={generateQr && tplDef.showQR !== false}
-  currentIndex={previewRecipientIndex + 1}
-  total={total}
-  onPrev={prevRecipient}
-  onNext={nextRecipient}
-  variantLabel={currentVariant?.label}
-  onCycleVariant={cycleVariant}
-  // ─── CTA button props ──────────────────────────────────────────
-  buttonType={tplDef?.buttonType}
-  buttonText={tplDef?.buttonText}
-  buttonValue={tplDef?.buttonValue}
-/>
+        <PreviewPanel
+          recipientData={{ name: currentRecipient[mapping.placeholders?.[1]] || '', phone: mappedPhone }}
+          messageText={messagePreview}
+          qrUrl={generateQr ? mappedQrUrl : ''}
+          showQR={generateQr && tplDef.showQR !== false}
+          currentIndex={previewRecipientIndex + 1}
+          total={total}
+          onPrev={prevRecipient}
+          onNext={nextRecipient}
+          variantLabel={currentVariant?.label}
+          onCycleVariant={cycleVariant}
+          buttonType={tplDef?.buttonType}
+          buttonText={tplDef?.buttonText}
+          buttonValue={tplDef?.buttonValue}
+        />
         <SettingsPanel
           batchSize={batchSize}
           setBatchSize={setBatchSize}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/layout/Toast';
 
@@ -17,9 +17,11 @@ export default function LoginPage() {
     try {
       await login(email, password);
       showToast('success', 'Welcome back!', 'Login successful.');
+      // After login, the ProtectedRoute will handle redirection based on role/permissions.
       navigate('/');
     } catch (err) {
-      showToast('error', 'Login failed', err.response?.data?.message || err.message);
+      const msg = err.response?.data?.message || err.message || 'Login failed';
+      showToast('error', 'Login failed', msg);
     } finally {
       setLoading(false);
     }
@@ -42,7 +44,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 text-sm"
+              className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition"
               placeholder="you@example.com"
             />
           </div>
@@ -53,23 +55,29 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 text-sm"
+              className="w-full mt-1 border border-gray-200 rounded-lg p-2.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition"
               placeholder="••••••••"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-orange-500 text-white py-2.5 rounded-lg font-semibold hover:bg-orange-600 transition disabled:opacity-50"
+            className="w-full bg-orange-500 text-white py-2.5 rounded-lg font-semibold hover:bg-orange-600 transition disabled:opacity-50 flex items-center justify-center"
           >
-            {loading ? 'Logging in…' : 'Log in'}
+            {loading ? (
+              <>
+                <i className="fas fa-spinner fa-spin mr-2"></i> Logging in…
+              </>
+            ) : (
+              'Log in'
+            )}
           </button>
         </form>
 
-        <p className="text-xs text-gray-400 text-center mt-4">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-orange-500 hover:underline">Sign up</Link>
-        </p>
+        {/* Optional: Forgot password link (commented out) */}
+        {/* <p className="text-xs text-gray-400 text-center mt-4">
+          <Link to="/forgot-password" className="text-orange-500 hover:underline">Forgot password?</Link>
+        </p> */}
       </div>
     </div>
   );
