@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useToast } from '../components/layout/Toast';
@@ -16,7 +16,10 @@ export default function CheckInPage() {
   const [loading, setLoading] = useState(false);
   const [attendee, setAttendee] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
+  const inputRef = useRef(null);
+  const autoSubmitTimer = useRef(null);
 
+  // ─── Auto‑process QR from URL parameter ──────────────────────
   useEffect(() => {
     const qrParam = new URLSearchParams(location.search).get('qr');
     if (qrParam) {
@@ -24,6 +27,36 @@ export default function CheckInPage() {
     }
   }, [location.search]);
 
+  // ─── Auto‑submit for external scanners (keyboard input) ──────
+  useEffect(() => {
+    // Clear any previous timer
+    if (autoSubmitTimer.current) {
+      clearTimeout(autoSubmitTimer.current);
+      autoSubmitTimer.current = null;
+    }
+
+    // Only auto‑submit if the input is long enough (scanner data is usually > 20 chars)
+    if (manualInput.length > 20) {
+      // Wait 500ms after the last input change to ensure scanner has finished typing
+      autoSubmitTimer.current = setTimeout(() => {
+        if (manualInput.trim()) {
+          processCheckIn(manualInput.trim());
+        }
+        autoSubmitTimer.current = null;
+      }, 500);
+    }
+  }, [manualInput]);
+
+  // ─── Clean up timer on unmount ────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (autoSubmitTimer.current) {
+        clearTimeout(autoSubmitTimer.current);
+      }
+    };
+  }, []);
+
+  // ─── Handle QR scan from camera ───────────────────────────────
   const handleScan = (detectedCodes) => {
     if (detectedCodes && detectedCodes.length > 0 && !result) {
       const data = detectedCodes[0].rawValue;
@@ -40,20 +73,15 @@ export default function CheckInPage() {
     }
   };
 
+  // ─── Process check‑in ──────────────────────────────────────────
   const processCheckIn = async (qrData) => {
+    // Prevent duplicate submissions while loading
+    if (loading) return;
+
     setLoading(true);
     try {
-      const data = await api.post(`/campaigns/${campaignId}/check-in`, { qrData });
-      console.log('Check-in response:', data);
-
-      if (!data || !data.success) {
-        throw new Error(data?.message || 'Check-in failed');
-      }
-
-      const { recipient } = data.data;
-      if (!recipient) {
-        throw new Error('Recipient data missing in response');
-      }
+      const res = await api.post(`/campaigns/${campaignId}/check-in`, { qrData });
+      const { recipient } = res.data.data;
 
       setAttendee(recipient);
       setResult({
@@ -62,29 +90,39 @@ export default function CheckInPage() {
       });
       showToast('success', 'Checked In', `${recipient.name || recipient.phone} has been admitted.`);
     } catch (err) {
-      const msg = err.message || 'Check-in failed';
+      const msg = err.response?.data?.message || err.message;
       setResult({ success: false, message: `❌ ${msg}` });
       setAttendee(null);
       showToast('error', 'Check‑in failed', msg);
     } finally {
       setLoading(false);
+      // Clear the input after processing (success or fail)
+      setManualInput('');
     }
   };
 
+  // ─── Manual submit handler ──────────────────────────────────────
   const handleManualSubmit = (e) => {
     e.preventDefault();
     if (!manualInput.trim()) return;
     processCheckIn(manualInput.trim());
   };
 
+  // ─── Reset for another scan ────────────────────────────────────
   const resetScan = () => {
     setResult(null);
     setAttendee(null);
     setManualInput('');
     setCameraError(null);
     setScanning(true);
+    // Clear any pending auto‑submit timer
+    if (autoSubmitTimer.current) {
+      clearTimeout(autoSubmitTimer.current);
+      autoSubmitTimer.current = null;
+    }
   };
 
+  // ─── Switch camera ──────────────────────────────────────────────
   const toggleCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
@@ -117,6 +155,7 @@ export default function CheckInPage() {
             Scan the attendee's QR code using your camera, or paste the QR data below.
           </p>
 
+          {/* ─── Camera Scanner ───────────────────────────────────── */}
           {scanning ? (
             <div className="w-full max-w-sm mx-auto mb-4 bg-gray-100 rounded-lg overflow-hidden relative">
               {cameraError && (
@@ -127,7 +166,7 @@ export default function CheckInPage() {
               <Scanner
                 onScan={handleScan}
                 onError={handleError}
-                constraints={{ facingMode }}
+                constraints={{ facingMode: facingMode }}
                 styles={{
                   container: { width: '100%', paddingBottom: '100%', position: 'relative' },
                   video: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' },
@@ -145,6 +184,7 @@ export default function CheckInPage() {
             </div>
           )}
 
+          {/* ─── Camera controls ─────────────────────────────────── */}
           {scanning && !cameraError && (
             <div className="flex justify-center gap-2 mb-4">
               <button
@@ -162,6 +202,7 @@ export default function CheckInPage() {
             </div>
           )}
 
+          {/* ─── Result message ──────────────────────────────────── */}
           {result && (
             <div
               className={`p-4 rounded-lg border ${
@@ -193,18 +234,21 @@ export default function CheckInPage() {
             </div>
           )}
 
+          {/* ─── Manual input (with auto‑submit for external scanners) ── */}
           <form onSubmit={handleManualSubmit} className="mt-4 border-t pt-4">
             <label className="text-xs font-semibold text-gray-500 block mb-1">
               Or enter QR data manually (for external scanners):
             </label>
             <div className="flex gap-2">
               <input
+                ref={inputRef}
                 type="text"
                 value={manualInput}
                 onChange={(e) => setManualInput(e.target.value)}
                 placeholder="Paste scanned QR string..."
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
                 autoFocus={!scanning}
+                disabled={loading}
               />
               <button
                 type="submit"
@@ -214,9 +258,15 @@ export default function CheckInPage() {
                 {loading ? 'Checking...' : 'Check In'}
               </button>
             </div>
+            {loading && (
+              <p className="text-xs text-gray-400 mt-1">
+                <i className="fas fa-spinner fa-spin mr-1"></i> Processing...
+              </p>
+            )}
           </form>
         </div>
 
+        {/* ─── Instructions ──────────────────────────────────────── */}
         <div className="text-xs text-gray-400 bg-gray-50 rounded-lg p-4 border border-gray-200">
           <p className="font-semibold text-gray-600">How it works:</p>
           <ul className="list-disc list-inside space-y-1 mt-1">
@@ -224,6 +274,7 @@ export default function CheckInPage() {
             <li>Once scanned, the code becomes invalid for future entries.</li>
             <li>QR codes from one event cannot be used for another event.</li>
             <li>All scan attempts are logged for audit.</li>
+            <li>External scanners: focus the input field and scan – the system auto‑submits.</li>
           </ul>
         </div>
       </div>
