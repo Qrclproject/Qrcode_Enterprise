@@ -63,7 +63,8 @@ export default function SentHistoryPage() {
   const [editWaitUnit, setEditWaitUnit] = useState('minutes');
 
   const showToast = useToast();
- const handleView = (campaignId) => {
+
+  const handleView = (campaignId) => {
     navigate(`/campaigns/${campaignId}`);
   };
 
@@ -102,7 +103,8 @@ export default function SentHistoryPage() {
     try {
       await deleteCampaign(selectedCampaign._id);
       showToast('success', 'Deleted', `"${selectedCampaign.name}" removed.`);
-      fetchCampaigns();
+      // After deletion, refresh the list
+      await fetchCampaigns();
     } catch (err) {
       showToast('error', 'Delete failed', err.response?.data?.message || err.message);
     }
@@ -115,7 +117,12 @@ export default function SentHistoryPage() {
     try {
       await deleteAllCampaigns();
       showToast('success', 'All Deleted', 'All campaigns and QR images have been removed.');
-      fetchCampaigns();
+      // ✅ Reset to page 1 and force a fresh fetch
+      setPage(1);
+      // Use a small delay to ensure state updates before fetch
+      setTimeout(() => {
+        fetchCampaigns();
+      }, 100);
     } catch (err) {
       showToast('error', 'Delete all failed', err.response?.data?.message || err.message);
     }
@@ -240,17 +247,16 @@ export default function SentHistoryPage() {
         </div>
 
         {/* main table */}
-       <CampaignList
-        campaigns={pageData}
-        onEdit={openEditModal}
-        onDelete={(id) => {
-          const campaign = campaigns.find(c => c._id === id);
-          setSelectedCampaign(campaign);
-          setDeleteModalOpen(true);
-        }}
-        onView={handleView}   // 👈 new
-      />
-
+        <CampaignList
+          campaigns={pageData}
+          onEdit={openEditModal}
+          onDelete={(id) => {
+            const campaign = campaigns.find(c => c._id === id);
+            setSelectedCampaign(campaign);
+            setDeleteModalOpen(true);
+          }}
+          onView={handleView}
+        />
 
         {/* pagination */}
         <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t rounded-b-xl text-xs text-gray-500">

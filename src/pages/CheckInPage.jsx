@@ -29,7 +29,6 @@ export default function CheckInPage() {
 
   // ─── Auto‑submit for external scanners (keyboard input) ──────
   useEffect(() => {
-    // Clear any previous timer
     if (autoSubmitTimer.current) {
       clearTimeout(autoSubmitTimer.current);
       autoSubmitTimer.current = null;
@@ -56,6 +55,13 @@ export default function CheckInPage() {
     };
   }, []);
 
+  // ─── Focus the manual input when camera is off ──────────────
+  useEffect(() => {
+    if (!scanning && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [scanning]);
+
   // ─── Handle QR scan from camera ───────────────────────────────
   const handleScan = (detectedCodes) => {
     if (detectedCodes && detectedCodes.length > 0 && !result) {
@@ -75,7 +81,6 @@ export default function CheckInPage() {
 
   // ─── Process check‑in ──────────────────────────────────────────
   const processCheckIn = async (qrData) => {
-    // Prevent duplicate submissions while loading
     if (loading) return;
 
     setLoading(true);
@@ -96,7 +101,6 @@ export default function CheckInPage() {
       showToast('error', 'Check‑in failed', msg);
     } finally {
       setLoading(false);
-      // Clear the input after processing (success or fail)
       setManualInput('');
     }
   };
@@ -115,7 +119,6 @@ export default function CheckInPage() {
     setManualInput('');
     setCameraError(null);
     setScanning(true);
-    // Clear any pending auto‑submit timer
     if (autoSubmitTimer.current) {
       clearTimeout(autoSubmitTimer.current);
       autoSubmitTimer.current = null;
@@ -156,47 +159,47 @@ export default function CheckInPage() {
           </p>
 
           {/* ─── Camera Scanner ───────────────────────────────────── */}
-      {scanning ? (
-  <div className="w-full max-w-sm mx-auto mb-4 bg-gray-100 rounded-lg overflow-hidden relative">
-    {cameraError && (
-      <div className="absolute inset-0 flex items-center justify-center bg-red-50/80 z-10">
-        <p className="text-sm text-red-600 text-center px-4">{cameraError}</p>
-      </div>
-    )}
-    <div className="relative w-full" style={{ paddingBottom: '100%' }}>
-      <Scanner
-        onScan={handleScan}
-        onError={handleError}
-        constraints={{ facingMode: facingMode }}
-        styles={{
-          container: {
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          },
-          video: {
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-          },
-        }}
-      />
-      {/* ─── Optional scanning overlay ────────────────────────── */}
-      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-        <div className="w-3/4 h-3/4 border-2 border-orange-500 rounded-lg opacity-70"></div>
-        <div className="absolute w-8 h-1 bg-orange-500 animate-pulse rounded-full" style={{ top: '48%' }}></div>
-      </div>
-    </div>
-  </div>
-) :(
+          {scanning ? (
+            <div className="w-full max-w-sm mx-auto mb-4 bg-gray-100 rounded-lg overflow-hidden relative">
+              {cameraError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-red-50/80 z-10">
+                  <p className="text-sm text-red-600 text-center px-4">{cameraError}</p>
+                </div>
+              )}
+              <div className="relative w-full" style={{ paddingBottom: '100%' }}>
+                <Scanner
+                  onScan={handleScan}
+                  onError={handleError}
+                  constraints={{ facingMode: facingMode }}
+                  styles={{
+                    container: {
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                    video: {
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    },
+                  }}
+                />
+                {/* Scanning overlay */}
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="w-3/4 h-3/4 border-2 border-orange-500 rounded-lg opacity-70"></div>
+                  <div className="absolute w-8 h-1 bg-orange-500 animate-pulse rounded-full" style={{ top: '48%' }}></div>
+                </div>
+              </div>
+            </div>
+          ) : (
             <div className="text-center py-4">
               <button
                 onClick={resetScan}
@@ -257,18 +260,26 @@ export default function CheckInPage() {
             </div>
           )}
 
-          {/* ─── Manual input (with auto‑submit for external scanners) ── */}
+          {/* ─── Manual input (external scanner friendly) ──────── */}
           <form onSubmit={handleManualSubmit} className="mt-4 border-t pt-4">
-            <label className="text-xs font-semibold text-gray-500 block mb-1">
-              Or enter QR data manually (for external scanners):
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-gray-500">
+                External Scanner / Manual Entry
+              </label>
+              {!scanning && (
+                <span className="text-[10px] text-green-600 flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  Scanner ready
+                </span>
+              )}
+            </div>
             <div className="flex gap-2">
               <input
                 ref={inputRef}
                 type="text"
                 value={manualInput}
                 onChange={(e) => setManualInput(e.target.value)}
-                placeholder="Paste scanned QR string..."
+                placeholder="Paste or scan QR data here..."
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
                 autoFocus={!scanning}
                 disabled={loading}
@@ -281,6 +292,11 @@ export default function CheckInPage() {
                 {loading ? 'Checking...' : 'Check In'}
               </button>
             </div>
+            {!scanning && (
+              <p className="text-[10px] text-gray-400 mt-1">
+                Focus this field and scan with your external scanner – it will auto‑submit.
+              </p>
+            )}
             {loading && (
               <p className="text-xs text-gray-400 mt-1">
                 <i className="fas fa-spinner fa-spin mr-1"></i> Processing...
