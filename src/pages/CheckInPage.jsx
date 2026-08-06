@@ -17,7 +17,6 @@ export default function CheckInPage() {
   const [attendee, setAttendee] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
 
-  // ─── Auto‑process QR from URL parameter ──────────────────────
   useEffect(() => {
     const qrParam = new URLSearchParams(location.search).get('qr');
     if (qrParam) {
@@ -25,7 +24,6 @@ export default function CheckInPage() {
     }
   }, [location.search]);
 
-  // ─── Handle QR scan ──────────────────────────────────────────
   const handleScan = (detectedCodes) => {
     if (detectedCodes && detectedCodes.length > 0 && !result) {
       const data = detectedCodes[0].rawValue;
@@ -42,12 +40,20 @@ export default function CheckInPage() {
     }
   };
 
-  // ─── Process check‑in ────────────────────────────────────────
   const processCheckIn = async (qrData) => {
     setLoading(true);
     try {
-      const res = await api.post(`/campaigns/${campaignId}/check-in`, { qrData });
-      const { recipient } = res.data.data;
+      const data = await api.post(`/campaigns/${campaignId}/check-in`, { qrData });
+      console.log('Check-in response:', data);
+
+      if (!data || !data.success) {
+        throw new Error(data?.message || 'Check-in failed');
+      }
+
+      const { recipient } = data.data;
+      if (!recipient) {
+        throw new Error('Recipient data missing in response');
+      }
 
       setAttendee(recipient);
       setResult({
@@ -56,7 +62,7 @@ export default function CheckInPage() {
       });
       showToast('success', 'Checked In', `${recipient.name || recipient.phone} has been admitted.`);
     } catch (err) {
-      const msg = err.response?.data?.message || err.message;
+      const msg = err.message || 'Check-in failed';
       setResult({ success: false, message: `❌ ${msg}` });
       setAttendee(null);
       showToast('error', 'Check‑in failed', msg);
@@ -65,14 +71,12 @@ export default function CheckInPage() {
     }
   };
 
-  // ─── Manual submit ──────────────────────────────────────────
   const handleManualSubmit = (e) => {
     e.preventDefault();
     if (!manualInput.trim()) return;
     processCheckIn(manualInput.trim());
   };
 
-  // ─── Reset for another scan ──────────────────────────────────
   const resetScan = () => {
     setResult(null);
     setAttendee(null);
@@ -81,7 +85,6 @@ export default function CheckInPage() {
     setScanning(true);
   };
 
-  // ─── Switch camera ─────────────────────────────────────────────
   const toggleCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
@@ -114,7 +117,6 @@ export default function CheckInPage() {
             Scan the attendee's QR code using your camera, or paste the QR data below.
           </p>
 
-          {/* ─── Camera Scanner ─────────────────────────────────── */}
           {scanning ? (
             <div className="w-full max-w-sm mx-auto mb-4 bg-gray-100 rounded-lg overflow-hidden relative">
               {cameraError && (
@@ -125,9 +127,7 @@ export default function CheckInPage() {
               <Scanner
                 onScan={handleScan}
                 onError={handleError}
-                constraints={{
-                  facingMode: facingMode,
-                }}
+                constraints={{ facingMode }}
                 styles={{
                   container: { width: '100%', paddingBottom: '100%', position: 'relative' },
                   video: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' },
@@ -145,7 +145,6 @@ export default function CheckInPage() {
             </div>
           )}
 
-          {/* ─── Camera controls ─────────────────────────────────── */}
           {scanning && !cameraError && (
             <div className="flex justify-center gap-2 mb-4">
               <button
@@ -163,7 +162,6 @@ export default function CheckInPage() {
             </div>
           )}
 
-          {/* ─── Result message ──────────────────────────────────── */}
           {result && (
             <div
               className={`p-4 rounded-lg border ${
@@ -195,7 +193,6 @@ export default function CheckInPage() {
             </div>
           )}
 
-          {/* ─── Manual input ────────────────────────────────────── */}
           <form onSubmit={handleManualSubmit} className="mt-4 border-t pt-4">
             <label className="text-xs font-semibold text-gray-500 block mb-1">
               Or enter QR data manually (for external scanners):
@@ -220,7 +217,6 @@ export default function CheckInPage() {
           </form>
         </div>
 
-        {/* ─── Instructions ──────────────────────────────────────── */}
         <div className="text-xs text-gray-400 bg-gray-50 rounded-lg p-4 border border-gray-200">
           <p className="font-semibold text-gray-600">How it works:</p>
           <ul className="list-disc list-inside space-y-1 mt-1">
