@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { QrReader } from 'react-qr-reader';
+import { useState, useEffect } from 'react';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useToast } from '../components/layout/Toast';
 import api from '../services/api';
@@ -15,7 +15,6 @@ export default function CheckInPage() {
   const [manualInput, setManualInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [attendee, setAttendee] = useState(null);
-  const scannerRef = useRef(null);
   const [facingMode, setFacingMode] = useState('environment');
 
   // ─── Auto‑process QR from URL parameter ──────────────────────
@@ -27,17 +26,20 @@ export default function CheckInPage() {
   }, [location.search]);
 
   // ─── Handle QR scan ──────────────────────────────────────────
-  const handleScan = async (data) => {
-    if (data && !result) {
+  const handleScan = (detectedCodes) => {
+    if (detectedCodes && detectedCodes.length > 0 && !result) {
+      const data = detectedCodes[0].rawValue;
       setScanning(false);
-      await processCheckIn(data.text);
+      processCheckIn(data);
     }
   };
 
   const handleError = (err) => {
     console.error('QR scan error:', err);
-    setCameraError('Camera unavailable. Please use manual input below.');
-    setScanning(false);
+    if (err.message && err.message.toLowerCase().includes('camera')) {
+      setCameraError('Camera unavailable. Please use manual input below.');
+      setScanning(false);
+    }
   };
 
   // ─── Process check‑in ────────────────────────────────────────
@@ -79,12 +81,9 @@ export default function CheckInPage() {
     setScanning(true);
   };
 
-  // ─── Switch camera (front/back) ─────────────────────────────
+  // ─── Switch camera ─────────────────────────────────────────────
   const toggleCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
-    // Force restart scanner
-    setScanning(false);
-    setTimeout(() => setScanning(true), 100);
   };
 
   return (
@@ -115,7 +114,7 @@ export default function CheckInPage() {
             Scan the attendee's QR code using your camera, or paste the QR data below.
           </p>
 
-          {/* ─── Camera Scanner ────────────────────────────────── */}
+          {/* ─── Camera Scanner ─────────────────────────────────── */}
           {scanning ? (
             <div className="w-full max-w-sm mx-auto mb-4 bg-gray-100 rounded-lg overflow-hidden relative">
               {cameraError && (
@@ -123,30 +122,15 @@ export default function CheckInPage() {
                   <p className="text-sm text-red-600 text-center px-4">{cameraError}</p>
                 </div>
               )}
-              <QrReader
-                ref={scannerRef}
-                onResult={handleScan}
+              <Scanner
+                onScan={handleScan}
                 onError={handleError}
                 constraints={{
                   facingMode: facingMode,
-                  // iOS prefers an aspect ratio hint
-                  aspectRatio: { ideal: 1 },
                 }}
-                className="w-full"
-                containerStyle={{
-                  width: '100%',
-                  paddingBottom: '100%',
-                  position: 'relative',
-                  backgroundColor: '#f3f4f6',
-                }}
-                // ─── iOS‑critical video style ─────────────────
-                videoStyle={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover', // ✅ Fixes iOS blank screen
+                styles={{
+                  container: { width: '100%', paddingBottom: '100%', position: 'relative' },
+                  video: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' },
                 }}
               />
             </div>
@@ -161,7 +145,7 @@ export default function CheckInPage() {
             </div>
           )}
 
-          {/* ─── Camera controls ───────────────────────────────── */}
+          {/* ─── Camera controls ─────────────────────────────────── */}
           {scanning && !cameraError && (
             <div className="flex justify-center gap-2 mb-4">
               <button
@@ -170,10 +154,16 @@ export default function CheckInPage() {
               >
                 <i className="fas fa-sync-alt mr-1"></i> Switch Camera
               </button>
+              <button
+                onClick={() => setScanning(false)}
+                className="text-xs bg-red-200 hover:bg-red-300 px-3 py-1 rounded-full"
+              >
+                <i className="fas fa-stop mr-1"></i> Stop Camera
+              </button>
             </div>
           )}
 
-          {/* ─── Result message ────────────────────────────────── */}
+          {/* ─── Result message ──────────────────────────────────── */}
           {result && (
             <div
               className={`p-4 rounded-lg border ${
@@ -195,10 +185,17 @@ export default function CheckInPage() {
                   </p>
                 </div>
               )}
+
+              <button
+                onClick={resetScan}
+                className="mt-2 text-sm underline hover:no-underline"
+              >
+                Scan another
+              </button>
             </div>
           )}
 
-          {/* ─── Manual input ──────────────────────────────────── */}
+          {/* ─── Manual input ────────────────────────────────────── */}
           <form onSubmit={handleManualSubmit} className="mt-4 border-t pt-4">
             <label className="text-xs font-semibold text-gray-500 block mb-1">
               Or enter QR data manually (for external scanners):
