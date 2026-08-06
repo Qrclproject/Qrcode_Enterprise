@@ -20,7 +20,6 @@ export default function Sidebar({ onCloseMobile }) {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-2 mt-2">
-        {/* Added onClick to close mobile menu on selection */}
         <NavLink to="/" className={linkClass} onClick={onCloseMobile} end>
           <i className="fas fa-inbox w-4"></i> Campaign Builder
         </NavLink>
@@ -33,9 +32,13 @@ export default function Sidebar({ onCloseMobile }) {
         <NavLink to="/analytics" className={linkClass} onClick={onCloseMobile}>
           <i className="fas fa-chart-bar w-4"></i> Analytics
         </NavLink>
-        <NavLink to="/designs" className={linkClass}>
-  <i className="fas fa-paint-brush w-4"></i> Designs
-</NavLink>
+        <NavLink to="/designs" className={linkClass} onClick={onCloseMobile}>
+          <i className="fas fa-paint-brush w-4"></i> Designs
+        </NavLink>
+        {/* ─── Check‑In ─────────────────────────────────────────── */}
+        <NavLink to="/check-in" className={linkClass} onClick={onCloseMobile}>
+          <i className="fas fa-check-circle w-4"></i> Check‑In
+        </NavLink>
         <NavLink to="/settings" className={linkClass} onClick={onCloseMobile}>
           <i className="fas fa-cog w-4"></i> Settings
         </NavLink>

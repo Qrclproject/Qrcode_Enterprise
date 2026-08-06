@@ -9,7 +9,7 @@ import {
   deleteCampaign,
   retryFailedMessages,
   launchCampaign,
-  deleteAllCampaigns, // 👈 import
+  deleteAllCampaigns,
 } from '../services/campaignService';
 
 // ─── helpers ──────────────────────────────────────────────────────
@@ -63,6 +63,9 @@ export default function SentHistoryPage() {
   const [editWaitUnit, setEditWaitUnit] = useState('minutes');
 
   const showToast = useToast();
+ const handleView = (campaignId) => {
+    navigate(`/campaigns/${campaignId}`);
+  };
 
   // ─── Fetch campaigns ──────────────────────────────────────────
   const fetchCampaigns = useCallback(async () => {
@@ -237,15 +240,17 @@ export default function SentHistoryPage() {
         </div>
 
         {/* main table */}
-        <CampaignList
-          campaigns={pageData}
-          onEdit={openEditModal}
-          onDelete={(id) => {
-            const campaign = campaigns.find(c => c._id === id);
-            setSelectedCampaign(campaign);
-            setDeleteModalOpen(true);
-          }}
-        />
+       <CampaignList
+        campaigns={pageData}
+        onEdit={openEditModal}
+        onDelete={(id) => {
+          const campaign = campaigns.find(c => c._id === id);
+          setSelectedCampaign(campaign);
+          setDeleteModalOpen(true);
+        }}
+        onView={handleView}   // 👈 new
+      />
+
 
         {/* pagination */}
         <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t rounded-b-xl text-xs text-gray-500">

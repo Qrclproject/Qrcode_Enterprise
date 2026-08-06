@@ -1,7 +1,7 @@
 import Button from '../common/Button';
 
 const statusColors = {
-  completed: 'bg-green-100 text-green-700',   // from backend
+  completed: 'bg-green-100 text-green-700',
   delivered: 'bg-green-100 text-green-700',
   scheduled: 'bg-blue-100 text-blue-700',
   failed: 'bg-red-100 text-red-700',
@@ -10,7 +10,7 @@ const statusColors = {
   draft: 'bg-gray-100 text-gray-600',
 };
 
-export default function CampaignList({ campaigns, onEdit, onDelete }) {
+export default function CampaignList({ campaigns, onEdit, onDelete, onView }) {
   if (!campaigns || campaigns.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
@@ -84,6 +84,15 @@ export default function CampaignList({ campaigns, onEdit, onDelete }) {
                       >
                         <i className="fas fa-trash-alt"></i>
                       </button>
+                      {onView && (
+                        <button
+                          onClick={() => onView(c._id || c.id)}
+                          className="text-gray-400 hover:text-blue-600"
+                          title="View details"
+                        >
+                          <i className="fas fa-eye"></i>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

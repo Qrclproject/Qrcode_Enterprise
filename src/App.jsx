@@ -18,7 +18,10 @@ import SpreadsheetEditorPage from './pages/SpreadsheetEditorPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import VariantEditPage from './pages/VariantEditPage';
-
+import CheckInSelectorPage from './pages/CheckInSelectorPage';
+import CheckInPage from './pages/CheckInPage';
+import CampaignDetailPage from './pages/CampaignDetailPage';
+import ScanHistoryPage from './pages/ScanHistoryPage';
 export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const toggleMobileMenu = () => setMobileMenuOpen((prev) => !prev);
@@ -60,6 +63,10 @@ export default function App() {
                         <Route path="/templates/:templateId/variants/:variantIndex" element={<VariantEditPage />} />
                         <Route path="/" element={<CampaignBuilderPage />} />
                         <Route path="/history" element={<SentHistoryPage />} />
+                        <Route path="/campaigns/:campaignId" element={<ProtectedRoute><CampaignDetailPage /></ProtectedRoute>} />
+<Route path="/campaigns/:campaignId/scan-history" element={<ProtectedRoute><ScanHistoryPage /></ProtectedRoute>} />
+                        <Route path="/check-in" element={<ProtectedRoute><CheckInSelectorPage /></ProtectedRoute>} />
+<Route path="/check-in/:campaignId" element={<ProtectedRoute><CheckInPage /></ProtectedRoute>} />
                         <Route path="/templates" element={<TemplatesPage />} />
                         <Route path="/analytics" element={<AnalyticsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
