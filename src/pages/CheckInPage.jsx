@@ -202,7 +202,7 @@ export default function CheckInPage() {
                   : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
               }`}
             >
-              🔌 External Scanner
+              External Scanner
             </button>
           </div>
 
