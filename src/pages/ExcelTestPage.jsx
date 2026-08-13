@@ -44,8 +44,6 @@ export default function ExcelTestPage() {
 
   const [loadingCheck, setLoadingCheck] = useState(false);
   const [outputData, setOutputData] = useState(null);
-
-  // ─── NEW: State for sheet visibility ─────────────────────────
   const [showSheet, setShowSheet] = useState(false);
 
   // ─── Upload & Parse File ─────────────────────────────────────
@@ -70,7 +68,7 @@ export default function ExcelTestPage() {
         setWhatsappCheckDone(false);
         setInvalidNumbers([]);
         setInvalidRemoved(false);
-        setShowSheet(true); // automatically show sheet after upload
+        setShowSheet(true);
         showToast('success', 'File loaded', `Loaded ${json.length} rows.`);
       } catch (err) {
         showToast('error', 'Parse Error', err.message || 'Could not parse file');
@@ -149,7 +147,8 @@ export default function ExcelTestPage() {
       setInvalidRemoved(false);
       showToast('success', 'WhatsApp check complete', `Valid: ${validCount}, Invalid: ${invalid.length}`);
     } catch (err) {
-      showToast('error', 'Check failed', err.message || 'Could not check numbers');
+      console.error('WhatsApp check error:', err);
+      showToast('error', 'Check failed', err.response?.data?.message || err.message || 'Could not check numbers');
     } finally {
       setLoadingCheck(false);
     }
