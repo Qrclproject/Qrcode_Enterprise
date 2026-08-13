@@ -423,10 +423,15 @@ export default function CampaignBuilderPage() {
   // ─── Upload header image handler (now updates backend if campaign exists) ──
 const handleHeaderImageUpload = async (file) => {
   if (!file) {
+    // Removing image
     setHeaderImageUrl('');
+    setIncludeHeaderImage(false);   // ✅ turn off header image flag
     if (campaignId) {
       try {
-        await updateCampaignHeaderImage(campaignId, { headerImageUrl: '' });
+        await updateCampaignHeaderImage(campaignId, {
+          headerImageUrl: '',
+          includeHeaderImage: false,
+        });
         showToast('success', 'Image removed', 'Header image cleared.');
       } catch (err) {
         showToast('error', 'Failed to remove image', err.message);
@@ -440,9 +445,13 @@ const handleHeaderImageUpload = async (file) => {
     const res = await uploadCampaignHeader(file);
     const url = res.data?.url || res.url;
     setHeaderImageUrl(url);
+    setIncludeHeaderImage(true);   // ✅ automatically enable header image
 
     if (campaignId) {
-      await updateCampaignHeaderImage(campaignId, { headerImageUrl: url });
+      await updateCampaignHeaderImage(campaignId, {
+        headerImageUrl: url,
+        includeHeaderImage: true,  // ✅ persist both fields
+      });
     }
 
     showToast('success', 'Image uploaded', 'Header image will be used for all recipients.');
@@ -452,19 +461,24 @@ const handleHeaderImageUpload = async (file) => {
     setUploadingHeader(false);
   }
 };
-
   // ─── NEW: Toggle Include Header Image (and update backend if campaign exists) ──
 const handleIncludeHeaderImageToggle = async (checked) => {
   setIncludeHeaderImage(checked);
+  if (!checked) {
+    // If user turns off header image, also clear any static image
+    setHeaderImageUrl('');
+  }
   if (campaignId) {
     try {
-      await updateCampaignHeaderImage(campaignId, { includeHeaderImage: checked });
+      await updateCampaignHeaderImage(campaignId, {
+        includeHeaderImage: checked,
+        headerImageUrl: checked ? (headerImageUrl || '') : '',
+      });
     } catch (err) {
       showToast('error', 'Failed to update header setting', err.message);
     }
   }
 };
-
   // ─── Process data from spreadsheet editor ─────────────────────
   const processSpreadsheetData = useCallback(async (data, mappingObj, name) => {
     if (!data || data.length === 0) return;
