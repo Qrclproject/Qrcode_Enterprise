@@ -1,32 +1,80 @@
-// src/pages/CampaignDetailPage.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/layout/Toast';
-import { getCampaignById } from '../services/campaignService';
+import Button from '../components/common/Button';
+import {
+  getCampaignById,
+  retryFailedMessages,
+} from '../services/campaignService';
+
+// ─── Small stat card for summary ─────────────────────────────────
+function StatBadge({ label, value, color = 'gray', icon }) {
+  const colorClasses = {
+    green: 'bg-green-50 text-green-700 border-green-200',
+    red: 'bg-red-50 text-red-700 border-red-200',
+    blue: 'bg-blue-50 text-blue-700 border-blue-200',
+    orange: 'bg-orange-50 text-orange-700 border-orange-200',
+    gray: 'bg-gray-50 text-gray-700 border-gray-200',
+  };
+
+  return (
+    <div className={`rounded-xl border p-4 flex items-center gap-3 ${colorClasses[color] || colorClasses.gray}`}>
+      {icon && <i className={`fas ${icon} text-lg`}></i>}
+      <div>
+        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-xl font-bold">{value}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function CampaignDetailPage() {
   const { campaignId } = useParams();
   const navigate = useNavigate();
   const showToast = useToast();
+
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [retrying, setRetrying] = useState(false);
+
+  // Fetch campaign data
+  const fetchCampaign = useCallback(async () => {
+    try {
+      const res = await getCampaignById(campaignId);
+      setCampaign(res.data || res);
+    } catch (err) {
+      showToast('error', 'Failed to load campaign', err.message);
+      navigate(-1);
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId, navigate, showToast]);
 
   useEffect(() => {
-    const fetchCampaign = async () => {
-      try {
-        const res = await getCampaignById(campaignId);
-        setCampaign(res.data || res);
-      } catch (err) {
-        showToast('error', 'Failed to load campaign', err.message);
-        navigate(-1);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchCampaign();
-  }, [campaignId, navigate, showToast]);
+  }, [fetchCampaign]);
+
+  // Retry all failed recipients
+  const handleRetryAll = async () => {
+    const failedCount = campaign?.recipients?.filter(r => r.status === 'failed').length || 0;
+    if (failedCount === 0) {
+      showToast('info', 'Nothing to retry', 'No failed recipients to retry.');
+      return;
+    }
+    if (!window.confirm(`Retry sending to ${failedCount} failed recipient(s)?`)) return;
+    setRetrying(true);
+    try {
+      await retryFailedMessages(campaignId);
+      showToast('success', 'Retry started', 'Resending to failed recipients...');
+      await fetchCampaign(); // refresh data
+    } catch (err) {
+      showToast('error', 'Retry failed', err.message);
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -44,20 +92,30 @@ export default function CampaignDetailPage() {
     );
   }
 
+  // Derived stats
+  const recipients = campaign.recipients || [];
+  const total = recipients.length;
+  const sent = recipients.filter(r => r.status === 'sent').length;
+  const failed = recipients.filter(r => r.status === 'failed').length;
+  const pending = recipients.filter(r => r.status === 'pending').length;
+  const checkedIn = recipients.filter(r => r.checkedIn).length;
+
   // Filter recipients
-  let recipients = campaign.recipients || [];
+  let filteredRecipients = recipients;
   if (statusFilter !== 'all') {
-    recipients = recipients.filter(r => r.status === statusFilter);
+    filteredRecipients = filteredRecipients.filter(r => r.status === statusFilter);
   }
   if (search) {
     const s = search.toLowerCase();
-    recipients = recipients.filter(r =>
+    filteredRecipients = filteredRecipients.filter(r =>
       (r.name && r.name.toLowerCase().includes(s)) ||
       (r.phone && r.phone.toLowerCase().includes(s))
     );
   }
 
-  // Helper to display status badge
+  // Failed list
+  const failedRecipients = recipients.filter(r => r.status === 'failed');
+
   const statusBadge = (status) => {
     const colors = {
       sent: 'bg-green-100 text-green-700',
@@ -67,7 +125,6 @@ export default function CampaignDetailPage() {
     return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${colors[status] || 'bg-gray-100 text-gray-500'}`}>{status}</span>;
   };
 
-  // Check-in status
   const checkInBadge = (checkedIn) => {
     return checkedIn
       ? <span className="text-xs text-green-600"><i className="fas fa-check-circle"></i> Checked In</span>
@@ -76,14 +133,15 @@ export default function CampaignDetailPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-5">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center flex-wrap gap-2">
           <div>
             <h1 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
               <i className="fas fa-envelope-open-text text-orange-500"></i> {campaign.name}
             </h1>
             <p className="text-xs text-gray-400 mt-0.5">
-              {campaign.recipients?.length || 0} recipients · {campaign.status} · Created {new Date(campaign.createdAt).toLocaleDateString()}
+              {total} recipients · {campaign.status} · Created {new Date(campaign.createdAt).toLocaleDateString()}
             </p>
           </div>
           <button
@@ -92,6 +150,15 @@ export default function CampaignDetailPage() {
           >
             ← Back
           </button>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <StatBadge label="Total" value={total} color="gray" icon="fa-users" />
+          <StatBadge label="Sent" value={sent} color="green" icon="fa-check-circle" />
+          <StatBadge label="Failed" value={failed} color="red" icon="fa-exclamation-circle" />
+          <StatBadge label="Pending" value={pending} color="orange" icon="fa-clock" />
+          <StatBadge label="Checked In" value={checkedIn} color="blue" icon="fa-qrcode" />
         </div>
 
         {/* Filters */}
@@ -119,11 +186,11 @@ export default function CampaignDetailPage() {
             />
           </div>
           <div className="text-xs text-gray-500">
-            Showing {recipients.length} of {campaign.recipients?.length || 0}
+            Showing {filteredRecipients.length} of {total}
           </div>
         </div>
 
-        {/* Table */}
+        {/* Main Table */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 border-b">
@@ -137,14 +204,14 @@ export default function CampaignDetailPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {recipients.length === 0 ? (
+              {filteredRecipients.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-4 py-6 text-center text-gray-400 text-sm">
                     No recipients found.
                   </td>
                 </tr>
               ) : (
-                recipients.map((r, idx) => (
+                filteredRecipients.map((r, idx) => (
                   <tr key={idx} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">{r.name || '—'}</td>
@@ -172,15 +239,49 @@ export default function CampaignDetailPage() {
           </table>
         </div>
 
-        {/* Optional: Show failure reasons for failed messages */}
-        {recipients.some(r => r.status === 'failed') && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3">
-            <h4 className="text-xs font-semibold text-red-600 mb-1">Failed messages</h4>
-            {recipients.filter(r => r.status === 'failed').map((r, idx) => (
-              <div key={idx} className="text-xs text-red-500 py-0.5">
-                {r.phone}: {r.failureReason || 'Unknown error'}
-              </div>
-            ))}
+        {/* Failed Recipients Section */}
+        {failedRecipients.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-red-700 flex items-center gap-2">
+                <i className="fas fa-times-circle"></i>
+                Failed Recipients ({failedRecipients.length})
+              </h3>
+              <Button
+                variant="danger"
+                onClick={handleRetryAll}
+                disabled={retrying}
+              >
+                {retrying ? 'Retrying...' : 'Retry All Failed'}
+              </Button>
+            </div>
+
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {failedRecipients.map((r, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white rounded-lg border border-red-100 p-3 text-sm flex items-start justify-between gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-700">
+                      {r.name || 'Unknown'} <span className="text-gray-400">({r.phone})</span>
+                    </p>
+                    <p className="text-xs text-red-600 mt-0.5">
+                      Reason: {r.failureReason || 'Unknown error'}
+                    </p>
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                    <i className="fas fa-phone-slash mr-1"></i>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {failedRecipients.length === 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center text-sm text-green-700">
+            <i className="fas fa-check-circle mr-1"></i> No failed recipients in this campaign.
           </div>
         )}
       </div>
