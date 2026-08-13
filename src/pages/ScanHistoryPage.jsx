@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Modal from '../components/common/Modal';
 import { useToast } from '../components/layout/Toast';
@@ -12,21 +12,39 @@ export default function ScanHistoryPage() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedScan, setSelectedScan] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Debounce search
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // Fetch scan history from backend
-  const fetchHistory = async (resetPage = false) => {
+  const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { search, page: resetPage ? 1 : page, limit: 20 };
+      const params = {
+        search: debouncedSearch,
+        page,
+        limit: 20,
+      };
       const res = await api.get(`/campaigns/${campaignId}/scan-history`, { params });
 
       if (res.success) {
         setHistory(res.data.history || []);
         setTotalPages(res.data.totalPages || 1);
+        setTotalCount(res.data.total || 0);
       } else {
         throw new Error(res.message || 'Failed to load history');
       }
@@ -35,16 +53,23 @@ export default function ScanHistoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [campaignId, page, debouncedSearch, showToast]);
 
   useEffect(() => {
     fetchHistory();
-  }, [campaignId, page]);
+  }, [fetchHistory]);
 
   const handleSearch = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // prevent page reload
+    // Manual search trigger if needed
+    setDebouncedSearch(search);
     setPage(1);
-    fetchHistory(true);
+  };
+
+  const clearSearch = () => {
+    setSearch('');
+    setDebouncedSearch('');
+    setPage(1);
   };
 
   const openDetails = (scan) => {
@@ -56,6 +81,21 @@ export default function ScanHistoryPage() {
     status === 'success'
       ? 'bg-green-100 text-green-700'
       : 'bg-red-100 text-red-700';
+
+  // Helper to get attendee display name without phone
+  const getAttendeeDisplay = (scan) => {
+    if (scan.qrDataFields && scan.qrDataFields.length > 0) {
+      // Prefer a field labeled "name" if available, otherwise use the first field
+      const nameField = scan.qrDataFields.find(f => f.label.toLowerCase().includes('name')) || scan.qrDataFields[0];
+      return nameField.value || 'Attendee';
+    }
+    return 'Attendee';
+  };
+
+  // Apply status filter client-side (optional, could also be backend)
+  const filteredHistory = statusFilter === 'all'
+    ? history
+    : history.filter(scan => scan.status === statusFilter);
 
   if (loading) {
     return (
@@ -80,42 +120,67 @@ export default function ScanHistoryPage() {
           </button>
         </div>
 
-        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or phone..."
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
-          />
-          <button
-            type="submit"
-            className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-semibold"
-          >
-            Search
-          </button>
-        </form>
+        {/* Search & Filters */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <form onSubmit={handleSearch} className="flex-1 min-w-[200px] relative">
+            <div className="relative">
+              <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs"></i>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by attendee name or any QR field..."
+                className="w-full pl-8 pr-10 py-2 border border-gray-200 rounded-lg text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <i className="fas fa-times-circle"></i>
+                </button>
+              )}
+            </div>
+          </form>
 
-        {history.length === 0 ? (
-          <div className="text-center py-10 text-gray-400">No scans yet.</div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+          >
+            <option value="all">All Status</option>
+            <option value="success">Success</option>
+            <option value="failed">Failed</option>
+          </select>
+
+          <span className="text-xs text-gray-500">
+            {totalCount} result(s)
+          </span>
+        </div>
+
+        {filteredHistory.length === 0 ? (
+          <div className="text-center py-10 text-gray-400">
+            {search || statusFilter !== 'all' ? 'No matching scans found.' : 'No scans yet.'}
+          </div>
         ) : (
           <>
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-4 py-3 text-left">Name</th>
-                    <th className="px-4 py-3 text-left">Phone</th>
+                    <th className="px-4 py-3 text-left">Attendee</th>
                     <th className="px-4 py-3 text-left">Status</th>
                     <th className="px-4 py-3 text-left">Time</th>
                     <th className="px-4 py-3 text-left">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map((scan, idx) => (
+                  {filteredHistory.map((scan, idx) => (
                     <tr key={idx} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3">{scan.name || '—'}</td>
-                      <td className="px-4 py-3">{scan.phone}</td>
+                      <td className="px-4 py-3 font-medium text-gray-800">
+                        {getAttendeeDisplay(scan)}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(scan.status)}`}>
                           {scan.status}
@@ -186,11 +251,7 @@ export default function ScanHistoryPage() {
                 ))}
               </div>
             ) : (
-              // Fallback to name/phone if no custom fields
-              <>
-                <p><strong>Name:</strong> {selectedScan.name || '—'}</p>
-                <p><strong>Phone:</strong> {selectedScan.phone}</p>
-              </>
+              <p className="text-gray-500">No additional attendee details available.</p>
             )}
           </div>
           <div className="flex justify-end mt-4">
