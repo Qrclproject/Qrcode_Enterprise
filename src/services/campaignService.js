@@ -11,6 +11,7 @@ export const launchCampaign = (campaignId) =>
 export const getCampaignHistory = (params) =>
   api.get('/campaigns/history', { params });
 
+// Upload a static header image (returns URL)
 export const uploadCampaignHeader = (file) => {
   const formData = new FormData();
   formData.append('image', file);
@@ -18,6 +19,13 @@ export const uploadCampaignHeader = (file) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 };
+
+// Update campaign header image or includeHeaderImage flag
+// Accepts an object: { headerImageUrl?: string, includeHeaderImage?: boolean }
+export const updateCampaignHeaderImage = (campaignId, updates) =>
+  api.put(`/campaigns/${campaignId}/header-image`, updates);
+
+// Get single campaign by ID
 export const getCampaignById = (id) =>
   api.get(`/campaigns/${id}`);
 
@@ -37,6 +45,6 @@ export const getCampaignQRProgress = (campaignId) =>
 export const deleteCampaign = (id) =>
   api.delete(`/campaigns/${id}`);
 
-// ✅ Delete ALL campaigns for the current user (clears history)
+// Delete ALL campaigns for the current user (clears history)
 export const deleteAllCampaigns = () =>
   api.delete('/campaigns');
