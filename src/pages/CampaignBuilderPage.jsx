@@ -201,16 +201,16 @@ export default function CampaignBuilderPage() {
   const [qrGenProgress, setQrGenProgress] = useState(0);
   const pollingRef = useRef(null);
 
-  // ─── Static header image state ────────────────────────────────
+  // ─── Header image state ──────────────────────────────────────
   const [headerImageUrl, setHeaderImageUrl] = useState('');
   const [uploadingHeader, setUploadingHeader] = useState(false);
+  const [includeHeaderImage, setIncludeHeaderImage] = useState(false); // 👈 NEW toggle
 
   // ─── Name modal state ──────────────────────────────────────────
   const [showNameModal, setShowNameModal] = useState(false);
   const [pendingData, setPendingData] = useState(null);
   const [pendingMapping, setPendingMapping] = useState(null);
 
-  // ─── Prevent duplicate processing ─────────────────────────────
   const processedRef = useRef('');
 
   // ─── Design and QR control ────────────────────────────────────
@@ -236,7 +236,7 @@ export default function CampaignBuilderPage() {
     !isQrProcessing &&
     !isUploadingHeader &&
     !isRunning &&
-    (generateQr ? !!designId : true);
+    (includeHeaderImage && generateQr ? !!designId : true);  // if includeHeaderImage && generateQr, design must be selected
 
   // ─── Fetch templates from backend ─────────────────────────────
   useEffect(() => {
@@ -310,10 +310,6 @@ export default function CampaignBuilderPage() {
   const tplDef = templateDefs[template] || { name: 'Unknown', showQR: true, variants: [] };
   const currentVariant = tplDef.variants?.[previewVariantIndex];
 
-  // ─── NEW: Does the selected template support image/QR header? ──
-  const templateSupportsImage = tplDef.showQR !== false;
-
-  // ─── Derive QR-related fields from selected design ──────────
   const selectedDesign = designs.find(d => d._id === designId);
   const designQrDataFields = selectedDesign?.qrDataFields || [];
   const designTextOverlayPlaceholders = (selectedDesign?.textOverlays || []).map(ov => ov.placeholder);
@@ -423,7 +419,7 @@ export default function CampaignBuilderPage() {
     return () => clearPolling();
   }, []);
 
-  // ─── Upload header image handler ──────────────────────────────
+  // ─── Upload header image handler ────────────────────────
   const handleHeaderImageUpload = async (file) => {
     if (!file) {
       setHeaderImageUrl('');
@@ -445,7 +441,7 @@ export default function CampaignBuilderPage() {
   // ─── Process data from spreadsheet editor ─────────────────────
   const processSpreadsheetData = useCallback(async (data, mappingObj, name) => {
     if (!data || data.length === 0) return;
-    if (generateQr && !designId) {
+    if (includeHeaderImage && generateQr && !designId) {
       showToast('warning', 'Design required', 'Please select a design or turn off QR generation.');
       return;
     }
@@ -472,8 +468,9 @@ export default function CampaignBuilderPage() {
           qr: String(mappingObj.qr),
           ...mappingObj.placeholders,
         },
-        designId: generateQr && templateSupportsImage ? (designId || undefined) : undefined,
-        headerImageUrl: templateSupportsImage ? (headerImageUrl || undefined) : undefined,
+        // Only include headerImageUrl and designId if includeHeaderImage is true
+        headerImageUrl: includeHeaderImage ? (headerImageUrl || undefined) : undefined,
+        designId: includeHeaderImage && generateQr ? (designId || undefined) : undefined,
       };
 
       const res = await createCampaign(campaignData);
@@ -482,7 +479,7 @@ export default function CampaignBuilderPage() {
       setCampaignId(newId);
       setCampaignName(name || '');
 
-      if (generateQr && designId && templateSupportsImage) {
+      if (includeHeaderImage && generateQr && designId) {
         await generateCampaignQRs(newId);
         setQrGenStatus('processing');
         setQrGenTotal(recipients.length);
@@ -494,7 +491,11 @@ export default function CampaignBuilderPage() {
     } catch (err) {
       showToast('error', 'Campaign creation failed', err.message);
     }
-  }, [template, batchSize, waitValue, waitUnit, activeVariants, templateDefs, designId, generateQr, showToast, startQrPolling, headerImageUrl, templateSupportsImage]);
+  }, [
+    template, batchSize, waitValue, waitUnit,
+    activeVariants, templateDefs, designId, generateQr,
+    showToast, startQrPolling, headerImageUrl, includeHeaderImage
+  ]);
 
   // ─── Build restore state for navigation ──────────────────────
   const buildRestoreState = () => ({
@@ -510,9 +511,10 @@ export default function CampaignBuilderPage() {
     previewVariantIndex,
     campaignName,
     headerImageUrl,
+    includeHeaderImage,   // 👈 include new toggle
   });
 
-  // ─── 1) Data loading effect: runs when spreadsheet data arrives ──
+  // ─── 1) Data loading effect ─────────────────────────────────
   useEffect(() => {
     if (!location.state?.spreadsheetData) return;
 
@@ -540,6 +542,7 @@ export default function CampaignBuilderPage() {
     if (restoreState?.previewVariantIndex !== undefined) setPreviewVariantIndex(restoreState.previewVariantIndex);
     if (restoreState?.campaignName) setCampaignName(restoreState.campaignName);
     if (restoreState?.headerImageUrl) setHeaderImageUrl(restoreState.headerImageUrl);
+    if (restoreState?.includeHeaderImage !== undefined) setIncludeHeaderImage(restoreState.includeHeaderImage); // 👈 restore toggle
 
     setPreviewRecipientIndex(0);
     const active = activeVariants[template] || [];
@@ -557,7 +560,9 @@ export default function CampaignBuilderPage() {
       setPendingMapping(restoreState?.mapping || computeMapping(Object.keys(data[0] || {})));
       setShowNameModal(true);
     }
-  }, [location.state?.spreadsheetData, location.state?.restoreState, processSpreadsheetData, computeMapping, template, activeVariants, previewVariantIndex]);
+  }, [location.state?.spreadsheetData, location.state?.restoreState]);
+
+  // ─── (Removed automatic QR toggling effect) ──
 
   // ─── Campaign name modal handlers ─────────────────────────────
   const handleNameSubmit = () => {
@@ -615,13 +620,12 @@ export default function CampaignBuilderPage() {
     setCampaignName(campaign.name || '');
     setCampaignId(campaign._id || null);
     setGenerateQr(!!campaign.designId);
-    if (campaign.headerImageUrl) {
-      setHeaderImageUrl(campaign.headerImageUrl);
-    }
+    setHeaderImageUrl(campaign.headerImageUrl || '');
+    setIncludeHeaderImage(!!(campaign.headerImageUrl || campaign.designId)); // 👈 set toggle based on existing data
     showToast('info', 'Campaign Loaded', `"${campaign.name}" is ready for editing.`);
   };
 
-  // ─── Variant management ────────────────────────────────────────
+  // ─── Variant management (unchanged) ────────────────────────
   const toggleVariant = (tplKey, index) => {
     const active = [...(activeVariants[tplKey] || [])];
     const pos = active.indexOf(index);
@@ -668,17 +672,8 @@ export default function CampaignBuilderPage() {
     }
   };
 
-  // ─── Handle template change ──────────────────────────────────
   const handleTemplateChange = (newTemplate) => {
     setTemplate(newTemplate);
-    const def = templateDefs[newTemplate];
-    // Reset image/QR settings if new template does not support them
-    if (def && def.showQR === false) {
-      setGenerateQr(false);
-      setHeaderImageUrl('');
-      setDesignId('');
-      setShowQrConfigModal(false);
-    }
     const active = activeVariants[newTemplate] || [0];
     setPreviewVariantIndex(active[0] || 0);
     setCustomMessage('');
@@ -760,14 +755,12 @@ export default function CampaignBuilderPage() {
     setShowQrConfigModal(false);
     setHeaderImageUrl('');
     setUploadingHeader(false);
+    setIncludeHeaderImage(false); // 👈 reset toggle
   };
 
-  // ─── Toggle QR generation ─────────────────────────────────────
+  // ─── Toggle QR generation (only active if includeHeaderImage) ──
   const handleToggleQR = (checked) => {
-    if (!templateSupportsImage && checked) {
-      showToast('warning', 'Not supported', 'This template does not support QR images.');
-      return;
-    }
+    if (!includeHeaderImage) return; // guard: disabled when header image toggle off
     setGenerateQr(checked);
     if (checked && !designId && designs.length > 0) {
       setShowDesignModal(true);
@@ -1033,13 +1026,13 @@ export default function CampaignBuilderPage() {
           setCustomMessage={setCustomMessage}
           qrDataFields={designQrDataFields}
           textOverlayPlaceholders={designTextOverlayPlaceholders}
-          showQrFields={generateQr && !!designId && templateSupportsImage}
+          showQrFields={includeHeaderImage && generateQr && !!designId}
         />
         <PreviewPanel
           recipientData={{ name: currentRecipient[mapping.placeholders?.[1]] || '', phone: mappedPhone }}
           messageText={messagePreview}
-          qrUrl={generateQr ? mappedQrUrl : ''}
-          showQR={generateQr && templateSupportsImage}
+          qrUrl={includeHeaderImage && generateQr ? mappedQrUrl : ''}
+          showQR={includeHeaderImage && generateQr && tplDef.showQR !== false}
           currentIndex={previewRecipientIndex + 1}
           total={total}
           onPrev={prevRecipient}
@@ -1049,8 +1042,9 @@ export default function CampaignBuilderPage() {
           buttonType={tplDef?.buttonType}
           buttonText={tplDef?.buttonText}
           buttonValue={tplDef?.buttonValue}
-          headerImageUrl={headerImageUrl}
-          templateSupportsImage={templateSupportsImage}
+          headerImageUrl={includeHeaderImage ? headerImageUrl : ''}
+          includeHeaderImage={includeHeaderImage}
+          setIncludeHeaderImage={setIncludeHeaderImage}
         />
         <SettingsPanel
           batchSize={batchSize}
@@ -1076,7 +1070,7 @@ export default function CampaignBuilderPage() {
           uploadingHeader={uploadingHeader}
           panelDisabled={panelDisabled}
           canLaunch={canLaunch}
-          templateSupportsImage={templateSupportsImage}
+          headerImageEnabled={includeHeaderImage}
         />
       </div>
     </div>

@@ -1,4 +1,5 @@
 import PhonePreview from '../common/PhonePreview';
+import ToggleSwitch from '../common/ToggleSwitch';
 
 export default function PreviewPanel({
   recipientData,
@@ -15,8 +16,10 @@ export default function PreviewPanel({
   buttonType,
   buttonText,
   buttonValue,
-  // ─── NEW: Static header image ─────────────────────────────────
+  // ─── NEW: Header image toggle ─────────────────────────────────
   headerImageUrl,
+  includeHeaderImage,
+  setIncludeHeaderImage,
 }) {
   return (
     <div className="dashboard-panel p-4 bg-gray-50/80">
@@ -63,6 +66,14 @@ export default function PreviewPanel({
         </div>
       </div>
 
+      {/* ─── Toggle for Header Image ───────────────────────────── */}
+      <div className="flex items-center justify-between mb-3 mt-2">
+        <span className="text-[10px] font-semibold text-gray-500 uppercase">
+          Include Header Image
+        </span>
+        <ToggleSwitch checked={includeHeaderImage} onChange={setIncludeHeaderImage} />
+      </div>
+
       <PhonePreview
         name={recipientData?.name}
         phone={recipientData?.phone}
@@ -70,7 +81,7 @@ export default function PreviewPanel({
         isHtml={true}
         qrUrl={qrUrl}
         showQR={showQR}
-        headerImageUrl={headerImageUrl}   // 👈 pass header image
+        headerImageUrl={headerImageUrl}
         // ─── Pass button props ──────────────────────────────────────
         buttonType={buttonType}
         buttonText={buttonText}

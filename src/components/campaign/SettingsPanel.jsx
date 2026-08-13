@@ -18,7 +18,7 @@ export default function SettingsPanel({
   uploadingHeader,
   panelDisabled,
   canLaunch,
-  templateSupportsImage,   // 👈 new prop
+  headerImageEnabled,   // 👈 NEW: controls whether header image options are active
 }) {
   const [testNumber, setTestNumber] = useState('');
 
@@ -73,19 +73,14 @@ export default function SettingsPanel({
             accept="image/*"
             onChange={(e) => onHeaderImageUpload(e.target.files[0])}
             className="w-full text-xs mt-1 border border-gray-200 rounded-lg p-1.5"
-            disabled={uploadingHeader || !templateSupportsImage}   // 👈 disabled if not supported
+            disabled={uploadingHeader || !headerImageEnabled}
           />
           {uploadingHeader && (
             <span className="text-xs text-blue-600 flex items-center gap-1">
               <i className="fas fa-spinner fa-spin"></i> Uploading...
             </span>
           )}
-          {!templateSupportsImage && (
-            <p className="text-[10px] text-red-500 mt-1">
-              This template does not support an image header.
-            </p>
-          )}
-          {headerImageUrl && templateSupportsImage && !uploadingHeader && (
+          {headerImageUrl && !uploadingHeader && (
             <div className="mt-1 flex items-center gap-2">
               <img src={headerImageUrl} alt="Header" className="w-10 h-10 object-cover rounded border" />
               <span className="text-[10px] text-green-600">✓ Image ready</span>
@@ -93,6 +88,7 @@ export default function SettingsPanel({
                 onClick={() => onHeaderImageUpload(null)}
                 className="text-red-500 hover:text-red-700 text-xs"
                 title="Remove image"
+                disabled={!headerImageEnabled}
               >
                 <i className="fas fa-trash-alt"></i>
               </button>
@@ -101,7 +97,7 @@ export default function SettingsPanel({
         </div>
 
         {/* ─── QR Generation Toggle ─────────────────────────────── */}
-        <div className={`flex items-center justify-between ${!templateSupportsImage ? 'opacity-50' : ''}`}>
+        <div className="flex items-center justify-between">
           <span className="text-[10px] font-semibold text-gray-500 uppercase">Generate QR codes</span>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
@@ -109,17 +105,14 @@ export default function SettingsPanel({
               checked={generateQr}
               onChange={(e) => onToggleQR(e.target.checked)}
               className="sr-only peer"
-              disabled={!templateSupportsImage}   // 👈 disabled if not supported
+              disabled={!headerImageEnabled}
             />
             <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
           </label>
         </div>
-        {!templateSupportsImage && (
-          <p className="text-[10px] text-red-500 -mt-2">This template does not support QR codes.</p>
-        )}
 
         {/* Design selection (when QR is enabled) */}
-        {generateQr && templateSupportsImage && (
+        {generateQr && headerImageEnabled && (
           <div>
             <label className="text-[10px] font-semibold text-gray-400 uppercase">Pass Design</label>
             <div className="flex items-center gap-2 mt-0.5">
