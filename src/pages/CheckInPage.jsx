@@ -17,7 +17,6 @@ export default function CheckInPage() {
   const [loading, setLoading] = useState(false);
   const [attendee, setAttendee] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
-  const [torchOn, setTorchOn] = useState(false); // optional
   const inputRef = useRef(null);
   const autoSubmitTimer = useRef(null);
   const scanLockRef = useRef(false); // prevent multiple detections
@@ -202,7 +201,7 @@ export default function CheckInPage() {
                   : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
               }`}
             >
-              External Scanner
+              🔌 External Scanner
             </button>
           </div>
 
@@ -218,20 +217,15 @@ export default function CheckInPage() {
                   )}
                   <div className="relative w-full" style={{ paddingBottom: '100%' }}>
                     <Scanner
-                      onResult={handleScan}
+                      onScan={handleScan}   // ✅ keep working prop
                       onError={handleError}
                       constraints={{
                         facingMode: facingMode,
                         width: { ideal: 1280 },
                         height: { ideal: 720 },
                       }}
-                      formats={['qr_code']}  // only QR codes
                       scanDelay={500}
                       paused={!scanning}
-                      components={{
-                        torch: true,
-                        zoom: true,
-                      }}
                       styles={{
                         container: {
                           position: 'absolute',
