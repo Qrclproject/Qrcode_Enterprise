@@ -12,6 +12,7 @@ export default function Sidebar({ onCloseMobile }) {
     { to: '/templates', label: 'Templates', icon: 'fa-file-alt', permission: 'templates' },
     { to: '/analytics', label: 'Analytics', icon: 'fa-chart-bar', permission: 'analytics' },
     { to: '/designs', label: 'Designs', icon: 'fa-paint-brush', permission: 'designs' },
+    { to: '/excel-test', label: 'Excel Test', icon: 'fa-table', permission: 'excel-test' },   // 👈 NEW
     { to: '/check-in', label: 'Check‑In', icon: 'fa-check-circle', permission: 'checkin' },
   ];
 

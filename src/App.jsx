@@ -23,6 +23,7 @@ import CheckInSelectorPage from './pages/CheckInSelectorPage';
 import CheckInPage from './pages/CheckInPage';
 import CampaignDetailPage from './pages/CampaignDetailPage';
 import ScanHistoryPage from './pages/ScanHistoryPage';
+import ExcelTestPage from './pages/ExcelTestPage';   // 👈 NEW import
 
 export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -63,6 +64,7 @@ export default function App() {
                       <Header onToggleMobileMenu={toggleMobileMenu} />
                       <Routes>
                         <Route path="/" element={<CampaignBuilderPage />} />
+                        <Route path="/excel-test" element={<ExcelTestPage />} />  {/* 👈 Route added */}
                         <Route path="/history" element={<SentHistoryPage />} />
                         <Route path="/templates" element={<TemplatesPage />} />
                         <Route path="/analytics" element={<AnalyticsPage />} />

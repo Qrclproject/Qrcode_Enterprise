@@ -15,6 +15,7 @@ import {
   generateCampaignQRs,
   getCampaignQRProgress,
   getCampaignById,
+  uploadCampaignHeader,
 } from '../services/campaignService';
 import { getTemplates } from '../services/templateService';
 import { getDesigns } from '../services/designService';
@@ -122,6 +123,52 @@ function ModalDesignPreview({ design, isSelected, onSelect }) {
   );
 }
 
+// ─── Helper component: renders only QR Data Fields and Text Overlays ──
+function QrConfigFields({ columns, mapping, setMapping, qrDataFields, textOverlayPlaceholders }) {
+  const renderDropdown = (key, label) => (
+    <div key={key}>
+      <label className="text-[10px] font-semibold text-gray-400 uppercase">
+        {label} → {"{{" + key + "}}"}
+      </label>
+      <select
+        value={mapping.placeholders?.[key] || ''}
+        onChange={(e) => {
+          const newPlaceholders = { ...(mapping.placeholders || {}) };
+          newPlaceholders[key] = e.target.value;
+          setMapping({ ...mapping, placeholders: newPlaceholders });
+        }}
+        className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
+      >
+        <option value="">-- Select Column --</option>
+        {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
+      </select>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {qrDataFields.length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold text-orange-600 flex items-center gap-1">
+            <i className="fas fa-qrcode"></i> QR Data Fields
+          </h4>
+          <p className="text-[10px] text-gray-400 mb-2">These fields will be encrypted inside the QR code.</p>
+          {qrDataFields.map(key => renderDropdown(key, `QR Data ${key}`))}
+        </div>
+      )}
+      {textOverlayPlaceholders.length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold text-green-600 flex items-center gap-1">
+            <i className="fas fa-font"></i> Text Overlays
+          </h4>
+          <p className="text-[10px] text-gray-400 mb-2">These fields will be drawn on the pass image.</p>
+          {textOverlayPlaceholders.map(key => renderDropdown(key, `Overlay ${key}`))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Campaign Builder Page ────────────────────────────────
 export default function CampaignBuilderPage() {
   const location = useLocation();
@@ -148,11 +195,15 @@ export default function CampaignBuilderPage() {
   const [templateDefs, setTemplateDefs] = useState({});
 
   const [campaignId, setCampaignId] = useState(null);
-  const [campaignName, setCampaignName] = useState(''); // 👈 store campaign name
+  const [campaignName, setCampaignName] = useState('');
   const [qrGenStatus, setQrGenStatus] = useState('pending');
   const [qrGenTotal, setQrGenTotal] = useState(0);
   const [qrGenProgress, setQrGenProgress] = useState(0);
   const pollingRef = useRef(null);
+
+  // ─── NEW: Static header image state ──────────────────────────
+  const [headerImageUrl, setHeaderImageUrl] = useState('');
+  const [uploadingHeader, setUploadingHeader] = useState(false);
 
   // ─── Name modal state ──────────────────────────────────────────
   const [showNameModal, setShowNameModal] = useState(false);
@@ -167,8 +218,25 @@ export default function CampaignBuilderPage() {
   const [designId, setDesignId] = useState('');
   const [generateQr, setGenerateQr] = useState(false);
   const [showDesignModal, setShowDesignModal] = useState(false);
+  const [showQrConfigModal, setShowQrConfigModal] = useState(false);
 
   const showToast = useToast();
+
+  // ─── Derived readiness flags (must be after state declarations) ──
+  const isDataUploaded = !!parsedData;
+  const isTemplateSelected = !!template;
+  const isCampaignCreated = !!campaignId;
+  const isQrProcessing = qrGenStatus === 'processing';
+  const isUploadingHeader = uploadingHeader;
+  const panelDisabled = !isDataUploaded || !isTemplateSelected;
+  const canLaunch =
+    isDataUploaded &&
+    isTemplateSelected &&
+    isCampaignCreated &&
+    !isQrProcessing &&
+    !isUploadingHeader &&
+    !isRunning &&
+    (generateQr ? !!designId : true);  // if QR generation enabled, a design must be selected
 
   // ─── Fetch templates from backend ─────────────────────────────
   useEffect(() => {
@@ -241,6 +309,11 @@ export default function CampaignBuilderPage() {
 
   const tplDef = templateDefs[template] || { name: 'Unknown', showQR: true, variants: [] };
   const currentVariant = tplDef.variants?.[previewVariantIndex];
+
+  // ─── Derive QR-related fields from selected design ──────────
+  const selectedDesign = designs.find(d => d._id === designId);
+  const designQrDataFields = selectedDesign?.qrDataFields || [];
+  const designTextOverlayPlaceholders = (selectedDesign?.textOverlays || []).map(ov => ov.placeholder);
 
   // ─── Message preview with dynamic placeholders ────────────────
   const getMessageBody = () => {
@@ -347,6 +420,25 @@ export default function CampaignBuilderPage() {
     return () => clearPolling();
   }, []);
 
+  // ─── NEW: Upload header image handler ────────────────────────
+  const handleHeaderImageUpload = async (file) => {
+    if (!file) {
+      setHeaderImageUrl('');
+      return;
+    }
+    setUploadingHeader(true);
+    try {
+      const res = await uploadCampaignHeader(file);
+      const url = res.data?.url || res.url;
+      setHeaderImageUrl(url);
+      showToast('success', 'Image uploaded', 'Header image will be used for all recipients.');
+    } catch (err) {
+      showToast('error', 'Upload failed', err.message);
+    } finally {
+      setUploadingHeader(false);
+    }
+  };
+
   // ─── Process data from spreadsheet editor ─────────────────────
   const processSpreadsheetData = useCallback(async (data, mappingObj, name) => {
     if (!data || data.length === 0) return;
@@ -378,6 +470,7 @@ export default function CampaignBuilderPage() {
           ...mappingObj.placeholders,
         },
         designId: generateQr ? (designId || undefined) : undefined,
+        headerImageUrl: headerImageUrl || undefined,
       };
 
       const res = await createCampaign(campaignData);
@@ -398,7 +491,7 @@ export default function CampaignBuilderPage() {
     } catch (err) {
       showToast('error', 'Campaign creation failed', err.message);
     }
-  }, [template, batchSize, waitValue, waitUnit, activeVariants, templateDefs, designId, generateQr, showToast, startQrPolling]);
+  }, [template, batchSize, waitValue, waitUnit, activeVariants, templateDefs, designId, generateQr, showToast, startQrPolling, headerImageUrl]);
 
   // ─── Build restore state for navigation ──────────────────────
   const buildRestoreState = () => ({
@@ -413,6 +506,7 @@ export default function CampaignBuilderPage() {
     generateQr,
     previewVariantIndex,
     campaignName,
+    headerImageUrl,   // preserve header image when editing
   });
 
   // ─── 1) Data loading effect: runs when spreadsheet data arrives ──
@@ -422,7 +516,6 @@ export default function CampaignBuilderPage() {
     const restoreState = location.state?.restoreState;
     const data = location.state.spreadsheetData;
 
-    // If restoreState has mapping, use it directly – no auto‑mapping
     if (restoreState?.mapping) {
       setMapping(restoreState.mapping);
     } else {
@@ -432,7 +525,6 @@ export default function CampaignBuilderPage() {
       setMapping(newMapping);
     }
 
-    // Set parsed data and columns
     setParsedData(data);
     if (restoreState?.template) setTemplate(restoreState.template);
     if (restoreState?.batchSize) setBatchSize(restoreState.batchSize);
@@ -444,6 +536,7 @@ export default function CampaignBuilderPage() {
     if (restoreState?.generateQr !== undefined) setGenerateQr(restoreState.generateQr);
     if (restoreState?.previewVariantIndex !== undefined) setPreviewVariantIndex(restoreState.previewVariantIndex);
     if (restoreState?.campaignName) setCampaignName(restoreState.campaignName);
+    if (restoreState?.headerImageUrl) setHeaderImageUrl(restoreState.headerImageUrl);
 
     setPreviewRecipientIndex(0);
     const active = activeVariants[template] || [];
@@ -465,17 +558,7 @@ export default function CampaignBuilderPage() {
     }
   }, [location.state?.spreadsheetData, location.state?.restoreState]);
 
-  // ─── 2) QR toggling effect: re‑runs campaign creation when QR state changes ──
-  useEffect(() => {
-    if (!parsedData || !mapping.phone) return;
-    const key = parsedData.length + '_' + generateQr + '_' + designId + '_' + template;
-    if (processedRef.current === key) return;
-    processedRef.current = key;
-
-    // Use existing campaign name or a default
-    const name = campaignName || 'Campaign ' + new Date().toLocaleDateString();
-    processSpreadsheetData(parsedData, mapping, name);
-  }, [generateQr, designId, template, parsedData, mapping, processSpreadsheetData, campaignName]);
+  // ─── (Removed the automatic QR toggling effect to avoid duplicate campaigns) ──
 
   // ─── Campaign name modal handlers ─────────────────────────────
   const handleNameSubmit = () => {
@@ -493,7 +576,6 @@ export default function CampaignBuilderPage() {
     setShowNameModal(false);
     setPendingData(null);
     setPendingMapping(null);
-    // Reset the spreadsheet data so the user can re‑upload
     setParsedData(null);
     setColumns([]);
     showToast('info', 'Cancelled', 'Campaign creation cancelled.');
@@ -532,6 +614,11 @@ export default function CampaignBuilderPage() {
     setPreviewRecipientIndex(0);
     setPreviewVariantIndex((campaign.activeVariants || [0])[0] || 0);
     setCampaignName(campaign.name || '');
+    setCampaignId(campaign._id || null);
+    setGenerateQr(!!campaign.designId);
+    if (campaign.headerImageUrl) {
+      setHeaderImageUrl(campaign.headerImageUrl);
+    }
     showToast('info', 'Campaign Loaded', `"${campaign.name}" is ready for editing.`);
   };
 
@@ -662,6 +749,9 @@ export default function CampaignBuilderPage() {
     setShowNameModal(false);
     setPendingData(null);
     setPendingMapping(null);
+    setShowQrConfigModal(false);
+    setHeaderImageUrl('');
+    setUploadingHeader(false);
   };
 
   // ─── Toggle QR generation ─────────────────────────────────────
@@ -671,6 +761,7 @@ export default function CampaignBuilderPage() {
       setShowDesignModal(true);
     } else if (!checked) {
       setDesignId('');
+      setShowQrConfigModal(false);
     }
   };
 
@@ -678,6 +769,28 @@ export default function CampaignBuilderPage() {
   const handleSelectDesign = (selectedId) => {
     setDesignId(selectedId);
     setShowDesignModal(false);
+    const design = designs.find(d => d._id === selectedId);
+    const hasQrFields = design?.qrDataFields?.length > 0;
+    const hasTextOverlays = design?.textOverlays?.length > 0;
+    if (hasQrFields || hasTextOverlays) {
+      setShowQrConfigModal(true);
+    } else {
+      handleQrConfigProceed();
+    }
+  };
+
+  // ─── Proceed after QR config ─────────────────────────────────
+  const handleQrConfigProceed = () => {
+    setShowQrConfigModal(false);
+    if (parsedData && mapping.phone) {
+      if (campaignName) {
+        processSpreadsheetData(parsedData, mapping, campaignName);
+      } else {
+        setPendingData(parsedData);
+        setPendingMapping(mapping);
+        setShowNameModal(true);
+      }
+    }
   };
 
   // ─── Wait for templates ────────────────────────────────────────
@@ -776,7 +889,10 @@ export default function CampaignBuilderPage() {
       {/* ─── DESIGN SELECTION MODAL ─────────────────────────────── */}
       <Modal
         isOpen={showDesignModal}
-        onClose={() => setShowDesignModal(false)}
+        onClose={() => {
+          setShowDesignModal(false);
+          if (!designId) setGenerateQr(false);
+        }}
         title="Choose a Pass Design"
         size="max-w-md"
       >
@@ -828,6 +944,39 @@ export default function CampaignBuilderPage() {
         </div>
       </Modal>
 
+      {/* ─── QR CONFIG MODAL ─────────────────────────────────────── */}
+      <Modal
+        isOpen={showQrConfigModal}
+        onClose={() => {
+          setShowQrConfigModal(false);
+          setDesignId('');
+          setGenerateQr(false);
+        }}
+        title="Configure QR Code"
+        size="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Map the columns for the QR data fields and text overlays defined in the design.
+          </p>
+          <QrConfigFields
+            columns={columns}
+            mapping={mapping}
+            setMapping={setMapping}
+            qrDataFields={designQrDataFields}
+            textOverlayPlaceholders={designTextOverlayPlaceholders}
+          />
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => {
+              setShowQrConfigModal(false);
+              setDesignId('');
+              setGenerateQr(false);
+            }}>Cancel</Button>
+            <Button variant="primary" onClick={handleQrConfigProceed}>Proceed</Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* ─── CAMPAIGN NAME MODAL ─────────────────────────────────── */}
       <Modal
         isOpen={showNameModal}
@@ -870,6 +1019,9 @@ export default function CampaignBuilderPage() {
           toggleVariant={toggleVariant}
           customMessage={customMessage}
           setCustomMessage={setCustomMessage}
+          qrDataFields={designQrDataFields}
+          textOverlayPlaceholders={designTextOverlayPlaceholders}
+          showQrFields={generateQr && !!designId}
         />
         <PreviewPanel
           recipientData={{ name: currentRecipient[mapping.placeholders?.[1]] || '', phone: mappedPhone }}
@@ -885,6 +1037,7 @@ export default function CampaignBuilderPage() {
           buttonType={tplDef?.buttonType}
           buttonText={tplDef?.buttonText}
           buttonValue={tplDef?.buttonValue}
+          headerImageUrl={headerImageUrl}
         />
         <SettingsPanel
           batchSize={batchSize}
@@ -904,7 +1057,12 @@ export default function CampaignBuilderPage() {
           generateQr={generateQr}
           onToggleQR={handleToggleQR}
           onOpenDesignModal={() => setShowDesignModal(true)}
-          selectedDesignName={designs.find(d => d._id === designId)?.name || 'None'}
+          selectedDesignName={selectedDesign?.name || 'None'}
+          headerImageUrl={headerImageUrl}
+          onHeaderImageUpload={handleHeaderImageUpload}
+          uploadingHeader={uploadingHeader}
+          panelDisabled={panelDisabled}
+          canLaunch={canLaunch}
         />
       </div>
     </div>

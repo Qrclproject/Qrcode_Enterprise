@@ -15,6 +15,8 @@ export default function PreviewPanel({
   buttonType,
   buttonText,
   buttonValue,
+  // ─── NEW: Static header image ─────────────────────────────────
+  headerImageUrl,
 }) {
   return (
     <div className="dashboard-panel p-4 bg-gray-50/80">
@@ -68,6 +70,7 @@ export default function PreviewPanel({
         isHtml={true}
         qrUrl={qrUrl}
         showQR={showQR}
+        headerImageUrl={headerImageUrl}   // 👈 pass header image
         // ─── Pass button props ──────────────────────────────────────
         buttonType={buttonType}
         buttonText={buttonText}
@@ -75,7 +78,7 @@ export default function PreviewPanel({
       />
 
       {/* Quick link to view the actual QR/composite image */}
-      {showQR && qrUrl && (
+      {showQR && qrUrl && !headerImageUrl && (
         <div className="mt-2 text-center">
           <a
             href={qrUrl}

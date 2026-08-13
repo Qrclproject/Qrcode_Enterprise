@@ -11,7 +11,13 @@ export const launchCampaign = (campaignId) =>
 export const getCampaignHistory = (params) =>
   api.get('/campaigns/history', { params });
 
-// Get a single campaign by ID
+export const uploadCampaignHeader = (file) => {
+  const formData = new FormData();
+  formData.append('image', file);
+  return api.post('/campaigns/upload-header', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
 export const getCampaignById = (id) =>
   api.get(`/campaigns/${id}`);
 

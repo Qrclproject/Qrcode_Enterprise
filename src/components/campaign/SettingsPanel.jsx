@@ -13,13 +13,20 @@ export default function SettingsPanel({
   onToggleQR,
   onOpenDesignModal,
   selectedDesignName,
+  headerImageUrl,
+  onHeaderImageUpload,
+  uploadingHeader,
+  panelDisabled,          // ← NEW: disable all controls when no data / no template
+  canLaunch,              // ← NEW: whether launch button may be enabled
 }) {
   const [testNumber, setTestNumber] = useState('');
 
   return (
     <div className="dashboard-panel p-4">
       <div className="panel-header"><div className="panel-badge">4</div> SETTINGS & LAUNCH</div>
-      <div className="space-y-3 flex-1">
+
+      {/* fieldset disables all inner controls when panelDisabled is true */}
+      <fieldset disabled={panelDisabled} className="space-y-3 flex-1">
         {/* Messages Per Batch */}
         <div>
           <label className="text-[10px] font-semibold text-gray-400 uppercase">Messages Per Batch</label>
@@ -53,7 +60,42 @@ export default function SettingsPanel({
             className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5" />
         </div>
 
-        {/* ─── QR Generation Toggle ─────────────────────────────── */}
+        {/* Static Header Image */}
+        <div className="border-t pt-3">
+          <label className="text-[10px] font-semibold text-gray-400 uppercase">
+            Attach Header Image (optional)
+          </label>
+          <p className="text-[9px] text-gray-400 mt-0.5">
+            Use the same image for all recipients. Overrides personalised QR codes.
+          </p>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => onHeaderImageUpload(e.target.files[0])}
+            className="w-full text-xs mt-1 border border-gray-200 rounded-lg p-1.5"
+            disabled={uploadingHeader}
+          />
+          {uploadingHeader && (
+            <span className="text-xs text-blue-600 flex items-center gap-1">
+              <i className="fas fa-spinner fa-spin"></i> Uploading...
+            </span>
+          )}
+          {headerImageUrl && !uploadingHeader && (
+            <div className="mt-1 flex items-center gap-2">
+              <img src={headerImageUrl} alt="Header" className="w-10 h-10 object-cover rounded border" />
+              <span className="text-[10px] text-green-600">✓ Image ready</span>
+              <button
+                onClick={() => onHeaderImageUpload(null)}
+                className="text-red-500 hover:text-red-700 text-xs"
+                title="Remove image"
+              >
+                <i className="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* QR Generation Toggle */}
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-semibold text-gray-500 uppercase">Generate QR codes</span>
           <label className="relative inline-flex items-center cursor-pointer">
@@ -84,8 +126,11 @@ export default function SettingsPanel({
         </div>
 
         {/* Test Send */}
-        <button onClick={() => onTestSend(testNumber)}
-          className="w-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition flex items-center justify-center gap-2">
+        <button
+          onClick={() => onTestSend(testNumber)}
+          disabled={panelDisabled || !canLaunch || uploadingHeader}
+          className="w-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <i className="fas fa-flask"></i> Send Test to My Number
         </button>
         <div>
@@ -102,11 +147,14 @@ export default function SettingsPanel({
         )}
 
         {/* Launch Button */}
-        <button onClick={onLaunch} disabled={isRunning}
-          className="w-full bg-emerald-500 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-md shadow-emerald-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+        <button
+          onClick={onLaunch}
+          disabled={panelDisabled || !canLaunch || isRunning || uploadingHeader}
+          className="w-full bg-emerald-500 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-md shadow-emerald-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <i className="fas fa-rocket"></i> <span>LAUNCH CAMPAIGN</span>
         </button>
-      </div>
+      </fieldset>
     </div>
   );
 }

@@ -32,7 +32,6 @@ export default function CheckInPage() {
     setInputMode('external');
     setScanning(false);
     setCameraError(null);
-    // Focus the input after a short delay
     setTimeout(() => {
       if (inputRef.current) inputRef.current.focus();
     }, 100);
@@ -134,7 +133,6 @@ export default function CheckInPage() {
     setAttendee(null);
     setManualInput('');
     setCameraError(null);
-    // Keep the current mode, but reset the scanner if in camera mode
     if (inputMode === 'camera') {
       setScanning(true);
     } else {
@@ -292,10 +290,22 @@ export default function CheckInPage() {
 
               {result.success && attendee && (
                 <div className="mt-3 bg-white rounded-lg p-3 border border-green-200 text-sm text-gray-700 space-y-1">
-                  <p><strong>Name:</strong> {attendee.name || '—'}</p>
-                  <p><strong>Phone:</strong> {attendee.phone}</p>
-                  {attendee.event && <p><strong>Event:</strong> {attendee.event}</p>}
-                  {attendee.date && <p><strong>Date:</strong> {attendee.date}</p>}
+                  <p className="font-semibold">Attendee Details</p>
+                  {/* Display QR Data Content fields if available */}
+                  {attendee.qrDataFields && attendee.qrDataFields.length > 0 ? (
+                    attendee.qrDataFields.map((field, idx) => (
+                      <p key={idx}>
+                        <strong>{field.label}:</strong> {field.value || '—'}
+                      </p>
+                    ))
+                  ) : (
+                    // Fallback: show name and event (but hide phone)
+                    <>
+                      <p><strong>Name:</strong> {attendee.name || '—'}</p>
+                      {attendee.event && <p><strong>Event:</strong> {attendee.event}</p>}
+                      {attendee.date && <p><strong>Date:</strong> {attendee.date}</p>}
+                    </>
+                  )}
                   <p className="text-xs text-green-600 mt-1">
                     Checked in at {new Date().toLocaleString()}
                   </p>

@@ -4,11 +4,14 @@ export default function PhonePreview({
   message,
   qrUrl,
   showQR = true,
+  headerImageUrl,   // 👈 NEW: optional static header image
   buttonType,
   buttonText,
   buttonValue,
 }) {
-  // ─── Render CTA button (if present) ────────────────────────────
+  // ─── Determine which image to show in the header ────────────────
+  const imageToShow = headerImageUrl || (showQR ? qrUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=Sample' : null);
+
   const renderButton = () => {
     if (!buttonType || buttonType === 'none') return null;
 
@@ -61,15 +64,17 @@ export default function PhonePreview({
       {/* ─── Scrollable message area ───────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-2 py-1.5">
         <div className="wa-bubble-out">
-          {/* QR code at the top (like WhatsApp media) */}
-          {showQR && (
+          {/* QR or static header image at the top (like WhatsApp media) */}
+          {imageToShow && (
             <div className="mb-2 bg-white p-1.5 rounded border border-gray-200 text-center">
               <img
-                src={qrUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=Sample'}
-                alt="QR"
+                src={imageToShow}
+                alt={headerImageUrl ? 'Header' : 'QR'}
                 className="mx-auto w-24 h-24 object-contain"
               />
-              <div className="text-[9px] text-gray-400 mt-0.5 truncate">qr_pass.png</div>
+              <div className="text-[9px] text-gray-400 mt-0.5 truncate">
+                {headerImageUrl ? 'header_image.png' : 'qr_pass.png'}
+              </div>
             </div>
           )}
 

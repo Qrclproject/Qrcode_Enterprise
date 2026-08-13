@@ -19,12 +19,40 @@ export default function MappingPanel({
   toggleVariant,
   customMessage,
   setCustomMessage,
+  // ─── QR-specific props (only shown when QR is ON and design selected) ───
+  qrDataFields = [],          // placeholder keys for QR data (e.g., ["1", "2"])
+  textOverlayPlaceholders = [], // placeholder keys for text overlays (e.g., ["name", "event"])
+  showQrFields = false,       // whether to show QR-specific sections
 }) {
   const tplDef = templateDefinitions[template];
 
-  // Get the first active variant (or the first variant if none active)
+  // Get variant placeholders
   const activeVariant = tplDef?.variants?.find(v => v.active) || tplDef?.variants?.[0];
-  const placeholders = activeVariant ? extractPlaceholders(activeVariant.body) : [];
+  const variantPlaceholders = activeVariant ? extractPlaceholders(activeVariant.body) : [];
+
+  // Helper to render a dropdown for a placeholder key
+  const renderPlaceholderDropdown = (key, labelPrefix) => {
+    const label = labelPrefix || `Placeholder ${key}`;
+    return (
+      <div key={key}>
+        <label className="text-[10px] font-semibold text-gray-400 uppercase">
+          {label} → {"{{" + key + "}}"}
+        </label>
+        <select
+          value={mapping.placeholders?.[key] || ''}
+          onChange={(e) => {
+            const newPlaceholders = { ...(mapping.placeholders || {}) };
+            newPlaceholders[key] = e.target.value;
+            setMapping({ ...mapping, placeholders: newPlaceholders });
+          }}
+          className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
+        >
+          <option value="">-- Select Column --</option>
+          {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
+        </select>
+      </div>
+    );
+  };
 
   return (
     <div className="dashboard-panel p-4">
@@ -57,26 +85,39 @@ export default function MappingPanel({
           </select>
         </div>
 
-        {/* ─── DYNAMIC PLACEHOLDER MAPPINGS ─── */}
-        {placeholders.map(num => (
-          <div key={num}>
-            <label className="text-[10px] font-semibold text-gray-400 uppercase">
-              Placeholder {num} → {"{{" + num + "}}"}
-            </label>
-            <select
-              value={mapping.placeholders?.[num] || ''}
-              onChange={(e) => {
-                const newPlaceholders = { ...(mapping.placeholders || {}) };
-                newPlaceholders[num] = e.target.value;
-                setMapping({ ...mapping, placeholders: newPlaceholders });
-              }}
-              className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
-            >
-              <option value="">-- Select Column --</option>
-              {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
-            </select>
+        {/* ─── VARIANT PLACEHOLDERS ─── */}
+        {variantPlaceholders.length > 0 && (
+          <div className="border-t pt-3">
+            <h4 className="text-[10px] font-semibold text-gray-400 uppercase">Message Variant Placeholders</h4>
+            {variantPlaceholders.map(num => renderPlaceholderDropdown(String(num)))}
           </div>
-        ))}
+        )}
+
+        {/* ─── QR DATA FIELDS (only when QR is ON and design selected) ─── */}
+        {showQrFields && qrDataFields.length > 0 && (
+          <div className="border-t pt-3">
+            <h4 className="text-[10px] font-semibold text-orange-600 uppercase">
+              <i className="fas fa-qrcode mr-1"></i> QR Data Fields
+            </h4>
+            <p className="text-[9px] text-gray-400 mt-0.5">
+              These fields will be encrypted inside the QR code.
+            </p>
+            {qrDataFields.map(key => renderPlaceholderDropdown(key, `QR Data ${key}`))}
+          </div>
+        )}
+
+        {/* ─── TEXT OVERLAYS (only when QR is ON and design selected) ─── */}
+        {showQrFields && textOverlayPlaceholders.length > 0 && (
+          <div className="border-t pt-3">
+            <h4 className="text-[10px] font-semibold text-green-600 uppercase">
+              <i className="fas fa-font mr-1"></i> Text Overlays
+            </h4>
+            <p className="text-[9px] text-gray-400 mt-0.5">
+              These fields will be drawn on the pass image.
+            </p>
+            {textOverlayPlaceholders.map(key => renderPlaceholderDropdown(key, `Overlay ${key}`))}
+          </div>
+        )}
 
         {/* ─── Template Selector ─── */}
         <div className="pt-2 border-t">

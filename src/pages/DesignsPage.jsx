@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../components/layout/Toast';
-import Modal from '../components/common/Modal';
 import Button from '../components/common/Button';
 import DesignEditor from '../components/designs/DesignEditor';
 import { getDesigns, deleteDesign } from '../services/designService';
@@ -153,13 +152,19 @@ export default function DesignsPage() {
         )}
       </div>
 
-      <Modal isOpen={showEditor} onClose={() => { setShowEditor(false); setSelectedDesign(null); }} title="" size="max-w-3xl">
-        <DesignEditor
-          onClose={() => { setShowEditor(false); setSelectedDesign(null); }}
-          onDesignCreated={handleDesignCreated}
-          initialDesign={selectedDesign}
-        />
-      </Modal>
+      {/* ─── Full‑screen editor overlay (replaces Modal) ─── */}
+      {showEditor && (
+        <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+          <DesignEditor
+            onClose={() => {
+              setShowEditor(false);
+              setSelectedDesign(null);
+            }}
+            onDesignCreated={handleDesignCreated}
+            initialDesign={selectedDesign}
+          />
+        </div>
+      )}
     </div>
   );
 }
