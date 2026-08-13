@@ -4,9 +4,10 @@ import api from './api';
 export const createCampaign = (data) => api.post('/campaigns', data);
 
 // Launch a campaign by its ID (starts sending messages)
-export const launchCampaign = (campaignId) =>
-  api.post('/campaigns/launch', { campaignId });
-
+export const launchCampaign = (campaignId) => {
+  console.log('📤 Sending POST /campaigns/launch with body:', { campaignId });
+  return api.post('/campaigns/launch', { campaignId });
+};
 // Get paginated campaign history (used by Sent History page)
 export const getCampaignHistory = (params) =>
   api.get('/campaigns/history', { params });

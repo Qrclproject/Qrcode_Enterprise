@@ -18,7 +18,7 @@ export default function SettingsPanel({
   uploadingHeader,
   panelDisabled,
   canLaunch,
-  headerImageEnabled,   // 👈 NEW: controls whether header image options are active
+  headerImageEnabled,   // controls whether header image options are active
 }) {
   const [testNumber, setTestNumber] = useState('');
 
@@ -61,13 +61,18 @@ export default function SettingsPanel({
         </div>
 
         {/* ─── Static Header Image ─────────────────────────────── */}
-        <div className="border-t pt-3">
+        <div className={`border-t pt-3 ${!headerImageEnabled ? 'opacity-60' : ''}`}>
           <label className="text-[10px] font-semibold text-gray-400 uppercase">
             Attach Header Image (optional)
           </label>
           <p className="text-[9px] text-gray-400 mt-0.5">
             Use the same image for all recipients. Overrides personalised QR codes.
           </p>
+          {!headerImageEnabled && (
+            <p className="text-[9px] text-orange-500 mt-1">
+              ⚠ Turn on <strong>Include Header Image</strong> in Live Preview to activate this section.
+            </p>
+          )}
           <input
             type="file"
             accept="image/*"
@@ -97,7 +102,7 @@ export default function SettingsPanel({
         </div>
 
         {/* ─── QR Generation Toggle ─────────────────────────────── */}
-        <div className="flex items-center justify-between">
+        <div className={`flex items-center justify-between ${!headerImageEnabled ? 'opacity-60' : ''}`}>
           <span className="text-[10px] font-semibold text-gray-500 uppercase">Generate QR codes</span>
           <label className="relative inline-flex items-center cursor-pointer">
             <input

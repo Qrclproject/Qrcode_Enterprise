@@ -16,7 +16,7 @@ import {
   getCampaignQRProgress,
   getCampaignById,
   uploadCampaignHeader,
-  updateCampaignHeaderImage,   // 👈 NEW IMPORT
+  updateCampaignHeaderImage,
 } from '../services/campaignService';
 import { getTemplates } from '../services/templateService';
 import { getDesigns } from '../services/designService';
@@ -230,16 +230,15 @@ export default function CampaignBuilderPage() {
   const isQrProcessing = qrGenStatus === 'processing';
   const isUploadingHeader = uploadingHeader;
   const panelDisabled = !isDataUploaded || !isTemplateSelected;
-  const canLaunch =
-    isDataUploaded &&
-    isTemplateSelected &&
-    isCampaignCreated &&
-    !isQrProcessing &&
-    !isUploadingHeader &&
-    !isRunning &&
-    (includeHeaderImage && generateQr ? !!designId : true);
+ const canLaunch =
+  isDataUploaded &&
+  isTemplateSelected &&
+  !isQrProcessing &&
+  !isUploadingHeader &&
+  !isRunning &&
+  (includeHeaderImage && generateQr ? !!designId : true);
 
-  // ─── Fetch templates from backend ─────────────────────────────
+  // ─── Fetch templates from backend (runs only once on mount) ──
   useEffect(() => {
     (async () => {
       try {
@@ -293,7 +292,7 @@ export default function CampaignBuilderPage() {
         showToast('warning', 'Using offline templates', 'Could not fetch templates from server.');
       }
     })();
-  }, [showToast, template]);
+  }, [showToast]);   // ✅ removed `template` from dependencies
 
   // ─── Fetch designs on mount ──────────────────────────────────
   useEffect(() => {
@@ -421,64 +420,65 @@ export default function CampaignBuilderPage() {
   }, []);
 
   // ─── Upload header image handler (now updates backend if campaign exists) ──
-const handleHeaderImageUpload = async (file) => {
-  if (!file) {
-    // Removing image
-    setHeaderImageUrl('');
-    setIncludeHeaderImage(false);   // ✅ turn off header image flag
+  const handleHeaderImageUpload = async (file) => {
+    if (!file) {
+      // Removing image
+      setHeaderImageUrl('');
+      setIncludeHeaderImage(false);
+      if (campaignId) {
+        try {
+          await updateCampaignHeaderImage(campaignId, {
+            headerImageUrl: '',
+            includeHeaderImage: false,
+          });
+          showToast('success', 'Image removed', 'Header image cleared.');
+        } catch (err) {
+          showToast('error', 'Failed to remove image', err.message);
+        }
+      }
+      return;
+    }
+
+    setUploadingHeader(true);
+    try {
+      const res = await uploadCampaignHeader(file);
+      const url = res.data?.url || res.url;
+      setHeaderImageUrl(url);
+      setIncludeHeaderImage(true);
+
+      if (campaignId) {
+        await updateCampaignHeaderImage(campaignId, {
+          headerImageUrl: url,
+          includeHeaderImage: true,
+        });
+      }
+
+      showToast('success', 'Image uploaded', 'Header image will be used for all recipients.');
+    } catch (err) {
+      showToast('error', 'Upload failed', err.message);
+    } finally {
+      setUploadingHeader(false);
+    }
+  };
+
+  // ─── NEW: Toggle Include Header Image (and update backend if campaign exists) ──
+  const handleIncludeHeaderImageToggle = async (checked) => {
+    setIncludeHeaderImage(checked);
+    if (!checked) {
+      setHeaderImageUrl('');
+    }
     if (campaignId) {
       try {
         await updateCampaignHeaderImage(campaignId, {
-          headerImageUrl: '',
-          includeHeaderImage: false,
+          includeHeaderImage: checked,
+          headerImageUrl: checked ? (headerImageUrl || '') : '',
         });
-        showToast('success', 'Image removed', 'Header image cleared.');
       } catch (err) {
-        showToast('error', 'Failed to remove image', err.message);
+        showToast('error', 'Failed to update header setting', err.message);
       }
     }
-    return;
-  }
+  };
 
-  setUploadingHeader(true);
-  try {
-    const res = await uploadCampaignHeader(file);
-    const url = res.data?.url || res.url;
-    setHeaderImageUrl(url);
-    setIncludeHeaderImage(true);   // ✅ automatically enable header image
-
-    if (campaignId) {
-      await updateCampaignHeaderImage(campaignId, {
-        headerImageUrl: url,
-        includeHeaderImage: true,  // ✅ persist both fields
-      });
-    }
-
-    showToast('success', 'Image uploaded', 'Header image will be used for all recipients.');
-  } catch (err) {
-    showToast('error', 'Upload failed', err.message);
-  } finally {
-    setUploadingHeader(false);
-  }
-};
-  // ─── NEW: Toggle Include Header Image (and update backend if campaign exists) ──
-const handleIncludeHeaderImageToggle = async (checked) => {
-  setIncludeHeaderImage(checked);
-  if (!checked) {
-    // If user turns off header image, also clear any static image
-    setHeaderImageUrl('');
-  }
-  if (campaignId) {
-    try {
-      await updateCampaignHeaderImage(campaignId, {
-        includeHeaderImage: checked,
-        headerImageUrl: checked ? (headerImageUrl || '') : '',
-      });
-    } catch (err) {
-      showToast('error', 'Failed to update header setting', err.message);
-    }
-  }
-};
   // ─── Process data from spreadsheet editor ─────────────────────
   const processSpreadsheetData = useCallback(async (data, mappingObj, name) => {
     if (!data || data.length === 0) return;
@@ -604,14 +604,9 @@ const handleIncludeHeaderImageToggle = async (checked) => {
 
     window.history.replaceState({}, document.title);
 
-    if (restoreState?.campaignName) {
-      const finalMapping = restoreState?.mapping || computeMapping(Object.keys(data[0] || {}));
-      processSpreadsheetData(data, finalMapping, restoreState.campaignName);
-    } else {
-      setPendingData(data);
-      setPendingMapping(restoreState?.mapping || computeMapping(Object.keys(data[0] || {})));
-      setShowNameModal(true);
-    }
+ setPendingData(data);
+setPendingMapping(restoreState?.mapping || computeMapping(Object.keys(data[0] || {})));
+
   }, [location.state?.spreadsheetData, location.state?.restoreState]);
 
   // ─── Campaign name modal handlers ─────────────────────────────
@@ -722,37 +717,85 @@ const handleIncludeHeaderImageToggle = async (checked) => {
     }
   };
 
+  // ✅ Template change resets campaignId to force new campaign creation
   const handleTemplateChange = (newTemplate) => {
     setTemplate(newTemplate);
     const active = activeVariants[newTemplate] || [0];
     setPreviewVariantIndex(active[0] || 0);
     setCustomMessage('');
+    setCampaignId(null);
+    setCampaignName('');
   };
 
-  // ─── Launch / test / retry ─────────────────────────────────────
-  const handleLaunch = async () => {
-    if (!parsedData || total === 0) return;
-    const cid = campaignId;
-    if (!cid) {
-      showToast('error', 'No campaign', 'Please upload a file first.');
+const handleLaunch = async () => {
+  if (!parsedData || total === 0) {
+    showToast('error', 'No data', 'Please upload an Excel/CSV file first.');
+    return;
+  }
+
+  let cid = campaignId;
+
+  // If campaign doesn't exist yet, create it now
+  if (!cid) {
+    if (!campaignName.trim()) {
+      // Ask for campaign name (or use default)
+      const name = prompt('Enter campaign name:', 'Campaign ' + new Date().toLocaleString());
+      if (!name) return;
+      setCampaignName(name);
+    }
+    setIsRunning(true);
+    setProgress(5);
+    setStatus('Creating campaign...');
+    try {
+      const created = await createCampaign({
+        name: campaignName || 'Campaign ' + new Date().toLocaleString(),
+        templateKey: template,
+        templateId: template,
+        recipients: parsedData.map(row => ({ ...row, phone: row[mapping.phone] || '' })),
+        batchSize: Number(batchSize),
+        waitValue: Number(waitValue),
+        waitUnit,
+        activeVariants: activeVariants[template] || [0],
+        variants: (templateDefs[template]?.variants || []).map(v => v.label),
+        mapping: {
+          phone: String(mapping.phone),
+          qr: String(mapping.qr),
+          ...mapping.placeholders,
+        },
+        headerImageUrl: includeHeaderImage ? (headerImageUrl || undefined) : undefined,
+        designId: includeHeaderImage && generateQr ? (designId || undefined) : undefined,
+        includeHeaderImage,
+      });
+      cid = created.data?._id || created.data?.id;
+      setCampaignId(cid);
+      setCampaignName(campaignName);
+      showToast('success', 'Campaign created', 'Now launching...');
+    } catch (err) {
+      setIsRunning(false);
+      showToast('error', 'Creation failed', err.message);
       return;
     }
-    try {
-      setIsRunning(true);
-      setProgress(10);
-      setStatus('Launching campaign...');
-      const result = await launchCampaign(cid);
-      setIsRunning(false);
-      setProgress(100);
-      const delivered = result.data?.delivered ?? 0;
-      const failed = result.data?.failed ?? 0;
-      showToast('success', 'Campaign Launched', `Sent: ${delivered} | Failed: ${failed}`);
-    } catch (error) {
-      setIsRunning(false);
-      showToast('error', 'Launch Failed', error.response?.data?.message || error.message);
-    }
-  };
+  }
 
+  // Launch the campaign
+  try {
+    setIsRunning(true);
+    setProgress(10);
+    setStatus('Launching campaign...');
+    console.log('📡 Calling launchCampaign with campaignId:', cid);
+    const result = await launchCampaign(cid);
+    console.log('✅ Launch response:', result);
+    setIsRunning(false);
+    setProgress(100);
+    const delivered = result.data?.delivered ?? 0;
+    const failed = result.data?.failed ?? 0;
+    showToast('success', 'Campaign Launched', `Sent: ${delivered} | Failed: ${failed}`);
+  } catch (error) {
+    console.error('❌ Launch failed:', error);
+    setIsRunning(false);
+    showToast('error', 'Launch Failed', error.response?.data?.message || error.message);
+  }
+};
   const handleTestSend = (phone) => {
     if (!phone) {
       showToast('warning', 'Missing Number', 'Please enter a phone number.');
@@ -1094,7 +1137,7 @@ const handleIncludeHeaderImageToggle = async (checked) => {
           buttonValue={tplDef?.buttonValue}
           headerImageUrl={includeHeaderImage ? headerImageUrl : ''}
           includeHeaderImage={includeHeaderImage}
-          setIncludeHeaderImage={handleIncludeHeaderImageToggle}   // 👈 use the new handler
+          setIncludeHeaderImage={handleIncludeHeaderImageToggle}
         />
         <SettingsPanel
           batchSize={batchSize}
