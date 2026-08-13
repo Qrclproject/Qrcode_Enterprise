@@ -201,7 +201,7 @@ export default function CampaignBuilderPage() {
   const [qrGenProgress, setQrGenProgress] = useState(0);
   const pollingRef = useRef(null);
 
-  // ─── NEW: Static header image state ──────────────────────────
+  // ─── Static header image state ────────────────────────────────
   const [headerImageUrl, setHeaderImageUrl] = useState('');
   const [uploadingHeader, setUploadingHeader] = useState(false);
 
@@ -222,7 +222,7 @@ export default function CampaignBuilderPage() {
 
   const showToast = useToast();
 
-  // ─── Derived readiness flags (must be after state declarations) ──
+  // ─── Derived readiness flags ───────────────────────────────────
   const isDataUploaded = !!parsedData;
   const isTemplateSelected = !!template;
   const isCampaignCreated = !!campaignId;
@@ -236,7 +236,7 @@ export default function CampaignBuilderPage() {
     !isQrProcessing &&
     !isUploadingHeader &&
     !isRunning &&
-    (generateQr ? !!designId : true);  // if QR generation enabled, a design must be selected
+    (generateQr ? !!designId : true);
 
   // ─── Fetch templates from backend ─────────────────────────────
   useEffect(() => {
@@ -309,6 +309,9 @@ export default function CampaignBuilderPage() {
 
   const tplDef = templateDefs[template] || { name: 'Unknown', showQR: true, variants: [] };
   const currentVariant = tplDef.variants?.[previewVariantIndex];
+
+  // ─── NEW: Does the selected template support image/QR header? ──
+  const templateSupportsImage = tplDef.showQR !== false;
 
   // ─── Derive QR-related fields from selected design ──────────
   const selectedDesign = designs.find(d => d._id === designId);
@@ -420,7 +423,7 @@ export default function CampaignBuilderPage() {
     return () => clearPolling();
   }, []);
 
-  // ─── NEW: Upload header image handler ────────────────────────
+  // ─── Upload header image handler ──────────────────────────────
   const handleHeaderImageUpload = async (file) => {
     if (!file) {
       setHeaderImageUrl('');
@@ -469,8 +472,8 @@ export default function CampaignBuilderPage() {
           qr: String(mappingObj.qr),
           ...mappingObj.placeholders,
         },
-        designId: generateQr ? (designId || undefined) : undefined,
-        headerImageUrl: headerImageUrl || undefined,
+        designId: generateQr && templateSupportsImage ? (designId || undefined) : undefined,
+        headerImageUrl: templateSupportsImage ? (headerImageUrl || undefined) : undefined,
       };
 
       const res = await createCampaign(campaignData);
@@ -479,7 +482,7 @@ export default function CampaignBuilderPage() {
       setCampaignId(newId);
       setCampaignName(name || '');
 
-      if (generateQr && designId) {
+      if (generateQr && designId && templateSupportsImage) {
         await generateCampaignQRs(newId);
         setQrGenStatus('processing');
         setQrGenTotal(recipients.length);
@@ -491,7 +494,7 @@ export default function CampaignBuilderPage() {
     } catch (err) {
       showToast('error', 'Campaign creation failed', err.message);
     }
-  }, [template, batchSize, waitValue, waitUnit, activeVariants, templateDefs, designId, generateQr, showToast, startQrPolling, headerImageUrl]);
+  }, [template, batchSize, waitValue, waitUnit, activeVariants, templateDefs, designId, generateQr, showToast, startQrPolling, headerImageUrl, templateSupportsImage]);
 
   // ─── Build restore state for navigation ──────────────────────
   const buildRestoreState = () => ({
@@ -506,7 +509,7 @@ export default function CampaignBuilderPage() {
     generateQr,
     previewVariantIndex,
     campaignName,
-    headerImageUrl,   // preserve header image when editing
+    headerImageUrl,
   });
 
   // ─── 1) Data loading effect: runs when spreadsheet data arrives ──
@@ -546,19 +549,15 @@ export default function CampaignBuilderPage() {
 
     window.history.replaceState({}, document.title);
 
-    // If we already have a campaign name (from restore), process immediately
     if (restoreState?.campaignName) {
       const finalMapping = restoreState?.mapping || computeMapping(Object.keys(data[0] || {}));
       processSpreadsheetData(data, finalMapping, restoreState.campaignName);
     } else {
-      // Otherwise, show the name modal
       setPendingData(data);
       setPendingMapping(restoreState?.mapping || computeMapping(Object.keys(data[0] || {})));
       setShowNameModal(true);
     }
-  }, [location.state?.spreadsheetData, location.state?.restoreState]);
-
-  // ─── (Removed the automatic QR toggling effect to avoid duplicate campaigns) ──
+  }, [location.state?.spreadsheetData, location.state?.restoreState, processSpreadsheetData, computeMapping, template, activeVariants, previewVariantIndex]);
 
   // ─── Campaign name modal handlers ─────────────────────────────
   const handleNameSubmit = () => {
@@ -669,8 +668,17 @@ export default function CampaignBuilderPage() {
     }
   };
 
+  // ─── Handle template change ──────────────────────────────────
   const handleTemplateChange = (newTemplate) => {
     setTemplate(newTemplate);
+    const def = templateDefs[newTemplate];
+    // Reset image/QR settings if new template does not support them
+    if (def && def.showQR === false) {
+      setGenerateQr(false);
+      setHeaderImageUrl('');
+      setDesignId('');
+      setShowQrConfigModal(false);
+    }
     const active = activeVariants[newTemplate] || [0];
     setPreviewVariantIndex(active[0] || 0);
     setCustomMessage('');
@@ -756,6 +764,10 @@ export default function CampaignBuilderPage() {
 
   // ─── Toggle QR generation ─────────────────────────────────────
   const handleToggleQR = (checked) => {
+    if (!templateSupportsImage && checked) {
+      showToast('warning', 'Not supported', 'This template does not support QR images.');
+      return;
+    }
     setGenerateQr(checked);
     if (checked && !designId && designs.length > 0) {
       setShowDesignModal(true);
@@ -1021,13 +1033,13 @@ export default function CampaignBuilderPage() {
           setCustomMessage={setCustomMessage}
           qrDataFields={designQrDataFields}
           textOverlayPlaceholders={designTextOverlayPlaceholders}
-          showQrFields={generateQr && !!designId}
+          showQrFields={generateQr && !!designId && templateSupportsImage}
         />
         <PreviewPanel
           recipientData={{ name: currentRecipient[mapping.placeholders?.[1]] || '', phone: mappedPhone }}
           messageText={messagePreview}
           qrUrl={generateQr ? mappedQrUrl : ''}
-          showQR={generateQr && tplDef.showQR !== false}
+          showQR={generateQr && templateSupportsImage}
           currentIndex={previewRecipientIndex + 1}
           total={total}
           onPrev={prevRecipient}
@@ -1038,6 +1050,7 @@ export default function CampaignBuilderPage() {
           buttonText={tplDef?.buttonText}
           buttonValue={tplDef?.buttonValue}
           headerImageUrl={headerImageUrl}
+          templateSupportsImage={templateSupportsImage}
         />
         <SettingsPanel
           batchSize={batchSize}
@@ -1063,6 +1076,7 @@ export default function CampaignBuilderPage() {
           uploadingHeader={uploadingHeader}
           panelDisabled={panelDisabled}
           canLaunch={canLaunch}
+          templateSupportsImage={templateSupportsImage}
         />
       </div>
     </div>

@@ -16,8 +16,9 @@ export default function SettingsPanel({
   headerImageUrl,
   onHeaderImageUpload,
   uploadingHeader,
-  panelDisabled,          // ← NEW: disable all controls when no data / no template
-  canLaunch,              // ← NEW: whether launch button may be enabled
+  panelDisabled,
+  canLaunch,
+  templateSupportsImage,   // 👈 new prop
 }) {
   const [testNumber, setTestNumber] = useState('');
 
@@ -25,7 +26,6 @@ export default function SettingsPanel({
     <div className="dashboard-panel p-4">
       <div className="panel-header"><div className="panel-badge">4</div> SETTINGS & LAUNCH</div>
 
-      {/* fieldset disables all inner controls when panelDisabled is true */}
       <fieldset disabled={panelDisabled} className="space-y-3 flex-1">
         {/* Messages Per Batch */}
         <div>
@@ -60,7 +60,7 @@ export default function SettingsPanel({
             className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5" />
         </div>
 
-        {/* Static Header Image */}
+        {/* ─── Static Header Image ─────────────────────────────── */}
         <div className="border-t pt-3">
           <label className="text-[10px] font-semibold text-gray-400 uppercase">
             Attach Header Image (optional)
@@ -73,14 +73,19 @@ export default function SettingsPanel({
             accept="image/*"
             onChange={(e) => onHeaderImageUpload(e.target.files[0])}
             className="w-full text-xs mt-1 border border-gray-200 rounded-lg p-1.5"
-            disabled={uploadingHeader}
+            disabled={uploadingHeader || !templateSupportsImage}   // 👈 disabled if not supported
           />
           {uploadingHeader && (
             <span className="text-xs text-blue-600 flex items-center gap-1">
               <i className="fas fa-spinner fa-spin"></i> Uploading...
             </span>
           )}
-          {headerImageUrl && !uploadingHeader && (
+          {!templateSupportsImage && (
+            <p className="text-[10px] text-red-500 mt-1">
+              This template does not support an image header.
+            </p>
+          )}
+          {headerImageUrl && templateSupportsImage && !uploadingHeader && (
             <div className="mt-1 flex items-center gap-2">
               <img src={headerImageUrl} alt="Header" className="w-10 h-10 object-cover rounded border" />
               <span className="text-[10px] text-green-600">✓ Image ready</span>
@@ -95,17 +100,26 @@ export default function SettingsPanel({
           )}
         </div>
 
-        {/* QR Generation Toggle */}
-        <div className="flex items-center justify-between">
+        {/* ─── QR Generation Toggle ─────────────────────────────── */}
+        <div className={`flex items-center justify-between ${!templateSupportsImage ? 'opacity-50' : ''}`}>
           <span className="text-[10px] font-semibold text-gray-500 uppercase">Generate QR codes</span>
           <label className="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" checked={generateQr} onChange={(e) => onToggleQR(e.target.checked)} className="sr-only peer" />
+            <input
+              type="checkbox"
+              checked={generateQr}
+              onChange={(e) => onToggleQR(e.target.checked)}
+              className="sr-only peer"
+              disabled={!templateSupportsImage}   // 👈 disabled if not supported
+            />
             <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
           </label>
         </div>
+        {!templateSupportsImage && (
+          <p className="text-[10px] text-red-500 -mt-2">This template does not support QR codes.</p>
+        )}
 
         {/* Design selection (when QR is enabled) */}
-        {generateQr && (
+        {generateQr && templateSupportsImage && (
           <div>
             <label className="text-[10px] font-semibold text-gray-400 uppercase">Pass Design</label>
             <div className="flex items-center gap-2 mt-0.5">
