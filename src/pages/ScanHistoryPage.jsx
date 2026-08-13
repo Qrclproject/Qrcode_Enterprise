@@ -8,6 +8,7 @@ export default function ScanHistoryPage() {
   const { campaignId } = useParams();
   const navigate = useNavigate();
   const showToast = useToast();
+
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -16,12 +17,13 @@ export default function ScanHistoryPage() {
   const [selectedScan, setSelectedScan] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Fetch scan history from backend
   const fetchHistory = async (resetPage = false) => {
     setLoading(true);
     try {
       const params = { search, page: resetPage ? 1 : page, limit: 20 };
       const res = await api.get(`/campaigns/${campaignId}/scan-history`, { params });
-      // Since api interceptor returns response.data, res is { success, data }
+
       if (res.success) {
         setHistory(res.data.history || []);
         setTotalPages(res.data.totalPages || 1);
@@ -135,6 +137,7 @@ export default function ScanHistoryPage() {
                 </tbody>
               </table>
             </div>
+
             {/* Pagination */}
             <div className="flex justify-between items-center mt-4 text-xs text-gray-500">
               <span>Page {page} of {totalPages}</span>
@@ -163,14 +166,37 @@ export default function ScanHistoryPage() {
       {selectedScan && (
         <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Scan Details">
           <div className="space-y-2 text-sm">
-            <p><strong>Name:</strong> {selectedScan.name || '—'}</p>
-            <p><strong>Phone:</strong> {selectedScan.phone}</p>
-            <p><strong>Status:</strong> <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(selectedScan.status)}`}>{selectedScan.status}</span></p>
+            <p>
+              <strong>Status:</strong>{' '}
+              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(selectedScan.status)}`}>
+                {selectedScan.status}
+              </span>
+            </p>
             <p><strong>Time:</strong> {new Date(selectedScan.timestamp).toLocaleString()}</p>
             {selectedScan.message && <p><strong>Message:</strong> {selectedScan.message}</p>}
+
+            {/* Display QR Data Content fields if available */}
+            {selectedScan.qrDataFields && selectedScan.qrDataFields.length > 0 ? (
+              <div className="border-t pt-2 mt-2">
+                <p className="font-semibold text-gray-700 mb-1">Attendee Details</p>
+                {selectedScan.qrDataFields.map((field, idx) => (
+                  <p key={idx}>
+                    <strong>{field.label}:</strong> {field.value || '—'}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              // Fallback to name/phone if no custom fields
+              <>
+                <p><strong>Name:</strong> {selectedScan.name || '—'}</p>
+                <p><strong>Phone:</strong> {selectedScan.phone}</p>
+              </>
+            )}
           </div>
           <div className="flex justify-end mt-4">
-            <button onClick={() => setModalOpen(false)} className="bg-gray-200 px-4 py-2 rounded text-sm">Close</button>
+            <button onClick={() => setModalOpen(false)} className="bg-gray-200 px-4 py-2 rounded text-sm">
+              Close
+            </button>
           </div>
         </Modal>
       )}

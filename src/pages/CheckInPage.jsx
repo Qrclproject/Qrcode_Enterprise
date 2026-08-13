@@ -19,7 +19,7 @@ export default function CheckInPage() {
   const [facingMode, setFacingMode] = useState('environment');
   const inputRef = useRef(null);
   const autoSubmitTimer = useRef(null);
-  const scanLockRef = useRef(false); // prevent multiple detections
+  const scanLockRef = useRef(false);
 
   // ─── Switch mode ──────────────────────────────────────────────
   const switchToCamera = () => {
@@ -82,7 +82,7 @@ export default function CheckInPage() {
   // ─── Handle QR scan from camera ─────────────────────────────
   const handleScan = (detectedCodes) => {
     if (!detectedCodes || detectedCodes.length === 0) return;
-    if (scanLockRef.current) return; // already processing
+    if (scanLockRef.current) return;
     scanLockRef.current = true;
     setScanning(false);
     const data = detectedCodes[0].rawValue;
@@ -156,6 +156,40 @@ export default function CheckInPage() {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
+  // ─── Helper to build a list of attendee fields to display ────
+  const getAttendeeFields = (attendee) => {
+    if (!attendee) return [];
+    const fields = [];
+    const excludedKeys = [
+      '_id', '__v', 'checkedIn', 'checkedInAt', 'status', 'qrUrl', 'qrDataFields'
+    ];
+
+    // If QR Data Content exists, show those first
+    if (attendee.qrDataFields && attendee.qrDataFields.length > 0) {
+      attendee.qrDataFields.forEach(field => {
+        fields.push({ label: field.label, value: field.value });
+      });
+    }
+
+    // Then show all other fields not excluded and not already displayed
+    Object.entries(attendee).forEach(([key, value]) => {
+      if (excludedKeys.includes(key)) return;
+      // Skip if the value is already shown via qrDataFields (best effort)
+      if (fields.some(f => f.label === key)) return;
+      if (typeof value === 'object' || value === undefined || value === null) return;
+      fields.push({ label: key, value: String(value) });
+    });
+
+    // Ensure phone is always shown, but not duplicated
+    if (!fields.some(f => f.label === 'phone')) {
+      fields.push({ label: 'phone', value: attendee.phone || '—' });
+    }
+
+    return fields;
+  };
+
+  const attendeeFields = getAttendeeFields(attendee);
+
   return (
     <div className="flex-1 overflow-y-auto p-5">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -217,7 +251,7 @@ export default function CheckInPage() {
                   )}
                   <div className="relative w-full" style={{ paddingBottom: '100%' }}>
                     <Scanner
-                      onScan={handleScan}   // ✅ keep working prop
+                      onScan={handleScan}
                       onError={handleError}
                       constraints={{
                         facingMode: facingMode,
@@ -302,22 +336,17 @@ export default function CheckInPage() {
               <p className="font-medium">{result.message}</p>
 
               {result.success && attendee && (
-                <div className="mt-3 bg-white rounded-lg p-3 border border-green-200 text-sm text-gray-700 space-y-1">
-                  <p className="font-semibold">Attendee Details</p>
-                  {attendee.qrDataFields && attendee.qrDataFields.length > 0 ? (
-                    attendee.qrDataFields.map((field, idx) => (
-                      <p key={idx}>
-                        <strong>{field.label}:</strong> {field.value || '—'}
-                      </p>
-                    ))
-                  ) : (
-                    <>
-                      <p><strong>Name:</strong> {attendee.name || '—'}</p>
-                      {attendee.event && <p><strong>Event:</strong> {attendee.event}</p>}
-                      {attendee.date && <p><strong>Date:</strong> {attendee.date}</p>}
-                    </>
-                  )}
-                  <p className="text-xs text-green-600 mt-1">
+                <div className="mt-3 bg-white rounded-lg p-4 border border-green-200 text-sm text-gray-700">
+                  <p className="font-semibold text-gray-800 mb-2">Attendee Details</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {attendeeFields.map((field, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <span className="text-gray-500 font-medium w-24 flex-shrink-0">{field.label}:</span>
+                        <span className="text-gray-700 break-words">{field.value || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-green-600 mt-3">
                     Checked in at {new Date().toLocaleString()}
                   </p>
                 </div>
@@ -325,7 +354,7 @@ export default function CheckInPage() {
 
               <button
                 onClick={resetScan}
-                className="mt-2 text-sm underline hover:no-underline"
+                className="mt-3 text-sm underline hover:no-underline"
               >
                 Scan another
               </button>
