@@ -1,11 +1,33 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useToast } from '../components/layout/Toast';
 import Button from '../components/common/Button';
 import DesignEditor from '../components/designs/DesignEditor';
 import { getDesigns, deleteDesign } from '../services/designService';
 
+// ─── Small stat card component ──────────────────────────────────
+function StatCard({ label, value, icon, color = 'gray' }) {
+  const colorClasses = {
+    blue: 'bg-blue-50 text-blue-700 border-blue-200',
+    green: 'bg-green-50 text-green-700 border-green-200',
+    orange: 'bg-orange-50 text-orange-700 border-orange-200',
+    gray: 'bg-gray-50 text-gray-700 border-gray-200',
+  };
+
+  return (
+    <div className={`rounded-xl border p-4 flex items-center gap-3 ${colorClasses[color] || colorClasses.gray}`}>
+      <div className="w-10 h-10 rounded-full bg-white/50 flex items-center justify-center">
+        <i className={`fas ${icon} text-lg`}></i>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-xl font-bold">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Sub‑component to display a saved design with QR overlay ----------
-function DesignCard({ design, onEdit, onDelete }) {
+function DesignCard({ design, onEdit, onDelete, onPreview }) {
   const [naturalDimensions, setNaturalDimensions] = useState({
     width: design.naturalWidth || 0,
     height: design.naturalHeight || 0
@@ -29,43 +51,66 @@ function DesignCard({ design, onEdit, onDelete }) {
     height: `${(height / naturalDimensions.height) * 100}%`,
   } : { display: 'none' };
 
+  const textOverlayCount = design.textOverlays?.length || 0;
+  const qrDataFieldCount = design.qrDataFields?.length || 0;
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm hover:shadow-md transition-shadow duration-200 relative group">
-      {/* Edit & Delete buttons – visible on hover */}
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+    <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-lg transition-all duration-200 relative group">
+      {/* Action buttons – always visible on mobile, hover on desktop */}
+      <div className="absolute top-3 right-3 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => onPreview(design.imageUrl)}
+          className="p-2 bg-white rounded-full shadow text-gray-500 hover:text-blue-600"
+          title="Preview full image"
+        >
+          <i className="fas fa-expand text-xs"></i>
+        </button>
         <button
           onClick={() => onEdit(design)}
-          className="p-1.5 bg-white rounded-full shadow text-gray-500 hover:text-blue-600"
+          className="p-2 bg-white rounded-full shadow text-gray-500 hover:text-blue-600"
           title="Edit design"
         >
           <i className="fas fa-pencil-alt text-xs"></i>
         </button>
         <button
           onClick={() => onDelete(design._id)}
-          className="p-1.5 bg-white rounded-full shadow text-gray-500 hover:text-red-600"
+          className="p-2 bg-white rounded-full shadow text-gray-500 hover:text-red-600"
           title="Delete design"
         >
           <i className="fas fa-trash-alt text-xs"></i>
         </button>
       </div>
 
-      <div className="relative w-full rounded-lg overflow-hidden bg-gray-50" style={{ lineHeight: 0 }}>
+      {/* Image with QR overlay */}
+      <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-gray-50 mb-3" style={{ lineHeight: 0 }}>
         <img
           src={design.imageUrl}
           alt={design.name}
-          className="w-full h-auto block select-none"
+          className="w-full h-full object-cover"
           onLoad={handleImageLoad}
         />
         {hasDimensions && (
           <div
-            className="absolute border-2 border-dashed border-orange-500 bg-orange-100/30 pointer-events-none rounded shadow-sm"
+            className="absolute border-2 border-dashed border-orange-500 bg-orange-100/30 pointer-events-none rounded-sm"
             style={style}
             title={`QR position: (${x},${y}) ${width}×${height}px`}
           />
         )}
       </div>
-      <h3 className="font-semibold text-sm text-gray-800 mt-2.5 truncate">{design.name}</h3>
-      <p className="text-[10px] text-gray-400 mt-1 font-mono">QR: ({x},{y}) {width}×{height}px</p>
+
+      {/* Design info */}
+      <h3 className="font-semibold text-sm text-gray-800 truncate">{design.name}</h3>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-gray-500">
+        <span className="bg-gray-100 px-2 py-0.5 rounded-full font-mono">
+          QR: ({x},{y})
+        </span>
+        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+          <i className="fas fa-font mr-1"></i>{textOverlayCount} overlays
+        </span>
+        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+          <i className="fas fa-qrcode mr-1"></i>{qrDataFieldCount} fields
+        </span>
+      </div>
     </div>
   );
 }
@@ -75,7 +120,8 @@ export default function DesignsPage() {
   const [designs, setDesigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEditor, setShowEditor] = useState(false);
-  const [selectedDesign, setSelectedDesign] = useState(null);   // for editing
+  const [selectedDesign, setSelectedDesign] = useState(null);
+  const [search, setSearch] = useState('');
   const showToast = useToast();
 
   const fetchDesigns = useCallback(async () => {
@@ -92,13 +138,18 @@ export default function DesignsPage() {
 
   useEffect(() => { fetchDesigns(); }, [fetchDesigns]);
 
+  // Filter designs by search term
+  const filteredDesigns = useMemo(() => {
+    if (!search.trim()) return designs;
+    const s = search.toLowerCase();
+    return designs.filter(d => d.name?.toLowerCase().includes(s));
+  }, [designs, search]);
+
   const handleDesignCreated = (newDesign) => {
     if (selectedDesign) {
-      // Update existing design in list
-      setDesigns((prev) => prev.map((d) => (d._id === newDesign._id ? newDesign : d)));
+      setDesigns(prev => prev.map((d) => (d._id === newDesign._id ? newDesign : d)));
     } else {
-      // Add new design to list
-      setDesigns((prev) => [newDesign, ...prev]);
+      setDesigns(prev => [newDesign, ...prev]);
     }
     setSelectedDesign(null);
   };
@@ -119,40 +170,80 @@ export default function DesignsPage() {
     }
   };
 
+  const handlePreview = (imageUrl) => {
+    window.open(imageUrl, '_blank');
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto p-5 bg-gray-50/30">
-      <div className="max-w-5xl mx-auto space-y-5">
-        <div className="flex justify-between items-center">
-          <h1 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
-            <i className="fas fa-paint-brush text-orange-500"></i> Designs
-          </h1>
-          <Button icon="plus" onClick={() => setShowEditor(true)}>New Design</Button>
+    <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-wrap justify-between items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-800 flex items-center gap-3">
+              <span className="bg-orange-100 text-orange-600 p-2 rounded-lg">
+                <i className="fas fa-paint-brush"></i>
+              </span>
+              Designs
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Create and manage custom pass designs for QR code overlays.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Search designs..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="border border-gray-200 rounded-xl px-4 py-2 text-xs w-56 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition"
+            />
+            <Button icon="plus" onClick={() => setShowEditor(true)}>New Design</Button>
+          </div>
         </div>
 
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatCard label="Total Designs" value={designs.length} icon="fa-object-group" color="blue" />
+          <StatCard label="Visible Designs" value={filteredDesigns.length} icon="fa-eye" color="green" />
+          <StatCard label="Total Overlays" value={designs.reduce((sum, d) => sum + (d.textOverlays?.length || 0), 0)} icon="fa-font" color="orange" />
+        </div>
+
+        {/* Loading / Empty / Grid */}
         {loading ? (
           <div className="flex justify-center py-20">
             <i className="fas fa-spinner fa-pulse text-3xl text-gray-400"></i>
           </div>
-        ) : designs.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-white">
-            No designs yet. Create one to use in your campaigns.
+        ) : filteredDesigns.length === 0 ? (
+          <div className="text-center py-20 text-gray-400 border border-dashed border-gray-200 rounded-2xl bg-white">
+            <i className="fas fa-paint-brush text-4xl mb-3 text-gray-300"></i>
+            <p className="text-lg font-medium text-gray-500">
+              {search ? 'No designs match your search.' : 'No designs yet. Create one to use in your campaigns.'}
+            </p>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => setShowEditor(true)}
+            >
+              <i className="fas fa-plus mr-1"></i> New Design
+            </Button>
           </div>
         ) : (
-          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
-            {designs.map((d) => (
-              <div key={d._id} className="break-inside-avoid">
-                <DesignCard
-                  design={d}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredDesigns.map((d) => (
+              <DesignCard
+                key={d._id}
+                design={d}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onPreview={handlePreview}
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* ─── Full‑screen editor overlay (replaces Modal) ─── */}
+      {/* Full‑screen editor overlay */}
       {showEditor && (
         <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
           <DesignEditor

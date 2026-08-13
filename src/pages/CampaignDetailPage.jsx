@@ -8,7 +8,7 @@ import {
 } from '../services/campaignService';
 
 // ─── Small stat card for summary ─────────────────────────────────
-function StatBadge({ label, value, color = 'gray', icon }) {
+function StatBadge({ label, value, color = 'gray', icon, subtitle }) {
   const colorClasses = {
     green: 'bg-green-50 text-green-700 border-green-200',
     red: 'bg-red-50 text-red-700 border-red-200',
@@ -20,9 +20,10 @@ function StatBadge({ label, value, color = 'gray', icon }) {
   return (
     <div className={`rounded-xl border p-4 flex items-center gap-3 ${colorClasses[color] || colorClasses.gray}`}>
       {icon && <i className={`fas ${icon} text-lg`}></i>}
-      <div>
+      <div className="flex-1 min-w-0">
         <p className="text-xs text-gray-500">{label}</p>
         <p className="text-xl font-bold">{value}</p>
+        {subtitle && <p className="text-[10px] text-gray-400 mt-0.5">{subtitle}</p>}
       </div>
     </div>
   );
@@ -68,12 +69,37 @@ export default function CampaignDetailPage() {
     try {
       await retryFailedMessages(campaignId);
       showToast('success', 'Retry started', 'Resending to failed recipients...');
-      await fetchCampaign(); // refresh data
+      await fetchCampaign();
     } catch (err) {
       showToast('error', 'Retry failed', err.message);
     } finally {
       setRetrying(false);
     }
+  };
+
+  // Export recipients to CSV
+  const exportCSV = () => {
+    if (!campaign?.recipients?.length) {
+      showToast('warning', 'No data', 'No recipients to export.');
+      return;
+    }
+    const headers = ['Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
+    const rows = campaign.recipients.map(r => [
+      r.name || '',
+      r.phone || '',
+      r.status || '',
+      r.checkedIn ? 'Yes' : 'No',
+      r.qrUrl || ''
+    ]);
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${campaign.name || 'campaign'}_recipients.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
 
   if (loading) {
@@ -99,6 +125,7 @@ export default function CampaignDetailPage() {
   const failed = recipients.filter(r => r.status === 'failed').length;
   const pending = recipients.filter(r => r.status === 'pending').length;
   const checkedIn = recipients.filter(r => r.checkedIn).length;
+  const deliveryRate = total > 0 ? Math.round((sent / total) * 100) : 0;
 
   // Filter recipients
   let filteredRecipients = recipients;
@@ -113,7 +140,6 @@ export default function CampaignDetailPage() {
     );
   }
 
-  // Failed list
   const failedRecipients = recipients.filter(r => r.status === 'failed');
 
   const statusBadge = (status) => {
@@ -132,33 +158,60 @@ export default function CampaignDetailPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-5">
+    <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center flex-wrap gap-2">
+        <div className="flex flex-wrap justify-between items-center gap-3">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
-              <i className="fas fa-envelope-open-text text-orange-500"></i> {campaign.name}
+            <h1 className="text-2xl font-extrabold text-gray-800 flex items-center gap-3">
+              <span className="bg-orange-100 text-orange-600 p-2 rounded-lg">
+                <i className="fas fa-envelope-open-text"></i>
+              </span>
+              {campaign.name}
             </h1>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {total} recipients · {campaign.status} · Created {new Date(campaign.createdAt).toLocaleDateString()}
+            <p className="text-sm text-gray-500 mt-1">
+              {total} recipients · Created {new Date(campaign.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <button
-            onClick={() => navigate(-1)}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
-            ← Back
-          </button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={exportCSV} icon="download">
+              Export CSV
+            </Button>
+            <Button variant="primary" onClick={() => navigate(`/check-in/${campaignId}`)} icon="qrcode">
+              Check-In
+            </Button>
+            <button
+              onClick={() => navigate(-1)}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              ← Back
+            </button>
+          </div>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <StatBadge label="Total" value={total} color="gray" icon="fa-users" />
           <StatBadge label="Sent" value={sent} color="green" icon="fa-check-circle" />
           <StatBadge label="Failed" value={failed} color="red" icon="fa-exclamation-circle" />
           <StatBadge label="Pending" value={pending} color="orange" icon="fa-clock" />
-          <StatBadge label="Checked In" value={checkedIn} color="blue" icon="fa-qrcode" />
+          <StatBadge label="Checked In" value={checkedIn} color="blue" icon="fa-qrcode" subtitle={`${total > 0 ? Math.round((checkedIn / total) * 100) : 0}%`} />
+        </div>
+
+        {/* Delivery Progress */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">Delivery Progress</span>
+            <span className="text-sm font-bold text-gray-800">{deliveryRate}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3">
+            <div
+              className={`h-3 rounded-full transition-all duration-300 ${
+                deliveryRate >= 80 ? 'bg-green-500' : deliveryRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+              }`}
+              style={{ width: `${deliveryRate}%` }}
+            ></div>
+          </div>
         </div>
 
         {/* Filters */}
@@ -270,6 +323,7 @@ export default function CampaignDetailPage() {
                       Reason: {r.failureReason || 'Unknown error'}
                     </p>
                   </div>
+                  {/* Future: individual retry can be added here */}
                   <span className="text-xs text-gray-400 whitespace-nowrap">
                     <i className="fas fa-phone-slash mr-1"></i>
                   </span>

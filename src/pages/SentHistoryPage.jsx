@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import CampaignList from '../components/campaign/CampaignList';
 import Modal from '../components/common/Modal';
 import Button from '../components/common/Button';
 import { useToast } from '../components/layout/Toast';
@@ -12,7 +11,7 @@ import {
   deleteAllCampaigns,
 } from '../services/campaignService';
 
-// ─── helpers ──────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────
 const formatWaitDisplay = (value, unit) => {
   const abbr = { seconds: 'sec', minutes: 'min', hours: 'hr', days: 'day(s)' };
   return `${value} ${abbr[unit] || unit}`;
@@ -41,6 +40,47 @@ const getWaitSeconds = (value, unit) => {
     default: return v * 60;
   }
 };
+
+// ─── Improved Stat Card with icon ────────────────────────────────
+function StatsCard({ label, value, icon, color = 'gray' }) {
+  const colorClasses = {
+    green: 'bg-green-50 text-green-700 border-green-200',
+    red: 'bg-red-50 text-red-700 border-red-200',
+    orange: 'bg-orange-50 text-orange-700 border-orange-200',
+    blue: 'bg-blue-50 text-blue-700 border-blue-200',
+    gray: 'bg-white text-gray-800 border-gray-200',
+  };
+  return (
+    <div className={`rounded-xl border p-4 flex items-center gap-3 ${colorClasses[color] || colorClasses.gray}`}>
+      <div className="w-10 h-10 rounded-full bg-white/50 flex items-center justify-center">
+        <i className={`fas ${icon} text-lg`}></i>
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-2xl font-bold">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Status badge component ──────────────────────────────────────
+function StatusBadge({ status }) {
+  const statusMap = {
+    completed: 'bg-green-100 text-green-700',
+    delivered: 'bg-green-100 text-green-700',
+    scheduled: 'bg-blue-100 text-blue-700',
+    failed: 'bg-red-100 text-red-700',
+    cancelled: 'bg-gray-100 text-gray-600',
+    sending: 'bg-yellow-100 text-yellow-700',
+    draft: 'bg-gray-100 text-gray-600',
+  };
+  const label = status === 'completed' ? 'Delivered' : status.charAt(0).toUpperCase() + status.slice(1);
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusMap[status] || 'bg-gray-100 text-gray-600'}`}>
+      {label}
+    </span>
+  );
+}
 
 export default function SentHistoryPage() {
   const navigate = useNavigate();
@@ -103,7 +143,6 @@ export default function SentHistoryPage() {
     try {
       await deleteCampaign(selectedCampaign._id);
       showToast('success', 'Deleted', `"${selectedCampaign.name}" removed.`);
-      // After deletion, refresh the list
       await fetchCampaigns();
     } catch (err) {
       showToast('error', 'Delete failed', err.response?.data?.message || err.message);
@@ -117,9 +156,7 @@ export default function SentHistoryPage() {
     try {
       await deleteAllCampaigns();
       showToast('success', 'All Deleted', 'All campaigns and QR images have been removed.');
-      // ✅ Reset to page 1 and force a fresh fetch
       setPage(1);
-      // Use a small delay to ensure state updates before fetch
       setTimeout(() => {
         fetchCampaigns();
       }, 100);
@@ -130,16 +167,6 @@ export default function SentHistoryPage() {
   };
 
   // ─── Retry functions ──────────────────────────────────────────
-  const retrySingle = async (campaignId, index) => {
-    try {
-      await retryFailedMessages(campaignId);
-      showToast('success', 'Retry started', 'Resending all failed messages...');
-      fetchCampaigns();
-    } catch (err) {
-      showToast('error', 'Retry failed', err.message);
-    }
-  };
-
   const retryAllFailed = async () => {
     if (!selectedCampaign) return;
     try {
@@ -155,8 +182,10 @@ export default function SentHistoryPage() {
   const applyAndResend = async () => {
     if (!selectedCampaign) return;
     try {
+      // Note: Current backend launch endpoint does not update batch settings.
+      // To fully support editing batch settings, a backend update endpoint would be needed.
       await launchCampaign(selectedCampaign._id);
-      showToast('success', 'Resend Initiated', 'Campaign restarted with new settings.');
+      showToast('success', 'Resend Initiated', 'Campaign restarted.');
       fetchCampaigns();
     } catch (err) {
       showToast('error', 'Resend failed', err.message);
@@ -186,15 +215,6 @@ export default function SentHistoryPage() {
     closeEditModal();
   };
 
-  // ─── Stats ────────────────────────────────────────────────────
-  const statTotal = totalCount;
-  const statDelivered = campaigns.filter(c => c.status === 'completed').length;
-  const statFailed = campaigns.filter(c => c.status === 'failed').length;
-  const statScheduled = campaigns.filter(c => c.status === 'scheduled').length;
-
-  // ─── Prepare page data ─────────────────────────────────────
-  const pageData = campaigns; // already paginated
-
   // ─── Loading state ─────────────────────────────────────────
   if (loading) {
     return (
@@ -206,15 +226,20 @@ export default function SentHistoryPage() {
 
   // ─── Main render ───────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-y-auto p-5">
-      <div className="max-w-7xl mx-auto space-y-5">
-        {/* header & filters */}
+    <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header & Filters */}
         <div className="flex flex-wrap justify-between items-center gap-4">
           <div>
-            <h1 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
-              <i className="fas fa-history text-orange-500"></i> Sent History
+            <h1 className="text-2xl font-extrabold text-gray-800 flex items-center gap-3">
+              <span className="bg-orange-100 text-orange-600 p-2 rounded-lg">
+                <i className="fas fa-history"></i>
+              </span>
+              Sent History
             </h1>
-            <p className="text-xs text-gray-400 mt-0.5">View, edit batch settings, retry failures, and resend campaigns with full control.</p>
+            <p className="text-sm text-gray-500 mt-1">
+              View, edit batch settings, retry failures, and resend campaigns with full control.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <input
@@ -222,12 +247,12 @@ export default function SentHistoryPage() {
               placeholder="Search campaigns..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs w-56 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition"
+              className="border border-gray-200 rounded-xl px-4 py-2 text-xs w-56 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition"
             />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition"
+              className="border border-gray-200 rounded-xl px-3 py-2 text-xs focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition"
             >
               <option value="all">All Status</option>
               <option value="completed">Delivered</option>
@@ -238,7 +263,7 @@ export default function SentHistoryPage() {
             {totalCount > 0 && (
               <button
                 onClick={() => setDeleteAllModalOpen(true)}
-                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1"
               >
                 <i className="fas fa-trash-alt mr-1"></i> Delete All
               </button>
@@ -246,20 +271,111 @@ export default function SentHistoryPage() {
           </div>
         </div>
 
-        {/* main table */}
-        <CampaignList
-          campaigns={pageData}
-          onEdit={openEditModal}
-          onDelete={(id) => {
-            const campaign = campaigns.find(c => c._id === id);
-            setSelectedCampaign(campaign);
-            setDeleteModalOpen(true);
-          }}
-          onView={handleView}
-        />
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard label="Total Campaigns" value={totalCount} icon="fa-inbox" color="blue" />
+          <StatsCard label="Delivered" value={campaigns.filter(c => c.status === 'completed').length} icon="fa-check-circle" color="green" />
+          <StatsCard label="Failed" value={campaigns.filter(c => c.status === 'failed').length} icon="fa-exclamation-circle" color="red" />
+          <StatsCard label="Scheduled" value={campaigns.filter(c => c.status === 'scheduled').length} icon="fa-clock" color="orange" />
+        </div>
 
-        {/* pagination */}
-        <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t rounded-b-xl text-xs text-gray-500">
+        {/* Campaign Table */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm text-left whitespace-nowrap">
+              <thead className="bg-gray-50 text-gray-500 font-semibold border-b">
+                <tr>
+                  <th className="px-5 py-3">Campaign</th>
+                  <th className="px-5 py-3">Template</th>
+                  <th className="px-5 py-3">Date</th>
+                  <th className="px-5 py-3">Recipients</th>
+                  <th className="px-5 py-3">Delivered</th>
+                  <th className="px-5 py-3">Failed</th>
+                  <th className="px-5 py-3">Success Rate</th>
+                  <th className="px-5 py-3">Batch Info</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {campaigns.length === 0 ? (
+                  <tr>
+                    <td colSpan="10" className="px-5 py-8 text-center text-gray-400">
+                      No campaigns found.
+                    </td>
+                  </tr>
+                ) : (
+                  campaigns.map((c) => {
+                    const recipCount = Array.isArray(c.recipients) ? c.recipients.length : c.recipients || 0;
+                    const delivered = c.delivered || 0;
+                    const failed = c.failed || 0;
+                    const successRate = recipCount > 0 ? Math.round((delivered / recipCount) * 100) : 0;
+                    const batchInfo = `${c.batchSize || '?'} msgs · ${c.waitValue || '?'} ${c.waitUnit || 'min'}`;
+
+                    return (
+                      <tr key={c._id} className="hover:bg-gray-50 transition">
+                        <td className="px-5 py-4 font-medium">{c.name}</td>
+                        <td className="px-5 py-4 text-gray-600">{c.templateName || c.template || '—'}</td>
+                        <td className="px-5 py-4 text-gray-500 text-xs">
+                          {new Date(c.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-5 py-4">{recipCount}</td>
+                        <td className="px-5 py-4 text-green-600 font-medium">{delivered}</td>
+                        <td className="px-5 py-4 text-red-600 font-medium">{failed}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-12 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${successRate >= 80 ? 'bg-green-500' : successRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                style={{ width: `${successRate}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-xs text-gray-500">{successRate}%</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-xs text-gray-500">{batchInfo}</td>
+                        <td className="px-5 py-4">
+                          <StatusBadge status={c.status} />
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openEditModal(c._id)}
+                              className="text-gray-400 hover:text-indigo-600"
+                              title="Edit & Resend"
+                            >
+                              <i className="fas fa-edit"></i>
+                            </button>
+                            <button
+                              onClick={() => handleView(c._id)}
+                              className="text-gray-400 hover:text-blue-600"
+                              title="View details"
+                            >
+                              <i className="fas fa-eye"></i>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedCampaign(c);
+                                setDeleteModalOpen(true);
+                              }}
+                              className="text-gray-400 hover:text-red-500"
+                              title="Delete"
+                            >
+                              <i className="fas fa-trash-alt"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-5 py-3 bg-white border rounded-b-xl text-xs text-gray-500">
           <span>
             Page {page} of {totalPages} (total {totalCount} campaigns)
           </span>
@@ -267,7 +383,7 @@ export default function SentHistoryPage() {
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-3 py-1 border border-gray-200 rounded bg-white hover:bg-gray-100 disabled:opacity-40 transition"
+              className="px-3 py-1 border border-gray-200 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-40 transition"
             >
               <i className="fas fa-chevron-left"></i>
             </button>
@@ -275,19 +391,11 @@ export default function SentHistoryPage() {
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="px-3 py-1 border border-gray-200 rounded bg-white hover:bg-gray-100 disabled:opacity-40 transition"
+              className="px-3 py-1 border border-gray-200 rounded-lg bg-white hover:bg-gray-100 disabled:opacity-40 transition"
             >
               <i className="fas fa-chevron-right"></i>
             </button>
           </div>
-        </div>
-
-        {/* stats cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatsCard label="Total Campaigns" value={statTotal} />
-          <StatsCard label="Delivered" value={statDelivered} color="green" />
-          <StatsCard label="Failed" value={statFailed} color="red" />
-          <StatsCard label="Scheduled" value={statScheduled} color="orange" />
         </div>
       </div>
 
@@ -372,23 +480,22 @@ export default function SentHistoryPage() {
                 <div className="max-h-48 overflow-y-auto text-xs">
                   <table className="w-full text-left">
                     <thead className="text-red-500 border-b border-red-200">
-                      <tr><th className="py-1">Phone</th><th className="py-1">Reason</th><th className="py-1 text-right">Action</th></tr>
+                      <tr><th className="py-1">Phone</th><th className="py-1">Reason</th></tr>
                     </thead>
                     <tbody>
                       {selectedCampaign.recipients?.filter(r => r.status === 'failed').map((r, idx) => (
                         <tr key={idx} className="border-b border-red-100">
                           <td className="py-1">{r.phone}</td>
                           <td className="py-1 text-red-500">{r.failureReason || 'Unknown'}</td>
-                          <td className="py-1 text-right">
-                            <button onClick={() => retrySingle(selectedCampaign._id, idx)} className="text-red-600 hover:underline text-xs">Retry</button>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <button onClick={retryAllFailed} className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 transition">Retry All Failed</button>
+                  <button onClick={retryAllFailed} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-700 transition">
+                    Retry All Failed
+                  </button>
                   <span className="text-xs text-red-500 self-center">{selectedCampaign.failed} remaining</span>
                 </div>
               </div>
@@ -458,20 +565,7 @@ export default function SentHistoryPage() {
   );
 }
 
-// ─── helper sub‑components ─────────────────────────────────────
-function StatsCard({ label, value, color = 'gray' }) {
-  const colorClasses = {
-    green: 'bg-green-50 border-green-200 text-green-700',
-    red: 'bg-red-50 border-red-200 text-red-700',
-    orange: 'bg-orange-50 border-orange-200 text-orange-700',
-    gray: 'bg-white border-gray-200 text-gray-800',
-  };
-  return <div className={`rounded-xl border p-4 text-center ${colorClasses[color] || colorClasses.gray}`}>
-    <p className="text-xs text-gray-500">{label}</p>
-    <p className="text-2xl font-bold">{value}</p>
-  </div>;
-}
-
+// ─── Helper sub‑components ─────────────────────────────────────
 function StatBox({ label, value, color = 'gray' }) {
   const colorMap = {
     green: 'bg-green-50 text-green-700',
@@ -479,10 +573,12 @@ function StatBox({ label, value, color = 'gray' }) {
     amber: 'bg-amber-50 text-amber-700',
     gray: 'bg-gray-50 text-gray-800',
   };
-  return <div className={`rounded-lg p-3 text-center ${colorMap[color] || colorMap.gray}`}>
-    <p className="text-xs text-gray-500">{label}</p>
-    <p className="text-xl font-bold">{value}</p>
-  </div>;
+  return (
+    <div className={`rounded-lg p-3 text-center ${colorMap[color] || colorMap.gray}`}>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-xl font-bold">{value}</p>
+    </div>
+  );
 }
 
 function generateSampleMessage(campaign) {
