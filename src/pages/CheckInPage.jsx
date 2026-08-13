@@ -104,7 +104,8 @@ export default function CheckInPage() {
     setLoading(true);
     try {
       const res = await api.post(`/campaigns/${campaignId}/check-in`, { qrData });
-      const { recipient } = res.data.data;
+      // ✅ Fix: api interceptor returns response.data, so res.data is the actual data object
+      const { recipient } = res.data;
 
       setAttendee(recipient);
       setResult({
@@ -174,7 +175,7 @@ export default function CheckInPage() {
     // Then show all other fields not excluded and not already displayed
     Object.entries(attendee).forEach(([key, value]) => {
       if (excludedKeys.includes(key)) return;
-      // Skip if the value is already shown via qrDataFields (best effort)
+      // Skip if the value is already shown via qrDataFields
       if (fields.some(f => f.label === key)) return;
       if (typeof value === 'object' || value === undefined || value === null) return;
       fields.push({ label: key, value: String(value) });
