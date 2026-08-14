@@ -24,7 +24,7 @@ import CheckInPage from './pages/CheckInPage';
 import CampaignDetailPage from './pages/CampaignDetailPage';
 import ScanHistoryPage from './pages/ScanHistoryPage';
 import ExcelTestPage from './pages/ExcelTestPage';   // 👈 NEW import
-
+import MediaLibraryPage from './pages/MediaLibraryPage';
 export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const toggleMobileMenu = () => setMobileMenuOpen((prev) => !prev);
@@ -63,6 +63,7 @@ export default function App() {
                     <main className="flex-1 flex flex-col h-screen overflow-hidden">
                       <Header onToggleMobileMenu={toggleMobileMenu} />
                       <Routes>
+                        <Route path="/media" element={<MediaLibraryPage />} />
                         <Route path="/" element={<CampaignBuilderPage />} />
                         <Route path="/excel-test" element={<ExcelTestPage />} />  {/* 👈 Route added */}
                         <Route path="/history" element={<SentHistoryPage />} />
