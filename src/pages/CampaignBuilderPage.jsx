@@ -20,7 +20,7 @@ import {
 } from '../services/campaignService';
 import { getTemplates } from '../services/templateService';
 import { getDesigns } from '../services/designService';
-
+import { normalizePhone } from '../utils/formatters';
 // ─── Static fallback templates (unchanged) ─────────────────────
 const staticFallback = [
   {
@@ -489,12 +489,14 @@ export default function CampaignBuilderPage() {
     }
 
     try {
-      const recipients = data.map(row => {
-        const rec = { ...row };
-        rec.phone = row[mappingObj.phone] || '';
-        return rec;
-      });
-
+const recipients = data.map(row => {
+  const rec = {};
+  Object.entries(row).forEach(([key, value]) => {
+    rec[key] = value === null || value === undefined ? '' : String(value);
+  });
+  rec.phone = normalizePhone(row[mappingObj.phone] || '');
+  return rec;
+});
       const campaignData = {
         name: name || 'Campaign ' + new Date().toLocaleDateString(),
         templateKey: template,

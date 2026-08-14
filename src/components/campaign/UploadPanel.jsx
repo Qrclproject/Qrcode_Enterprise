@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
 import { useToast } from '../layout/Toast';
+import { convertScientificNotation, normalizePhone } from '../../utils/formatters';
 
 export default function UploadPanel({ onReset }) {
   const navigate = useNavigate();
@@ -17,10 +18,30 @@ export default function UploadPanel({ onReset }) {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
         if (json.length === 0) throw new Error('Empty file');
-        
-        // Navigate to spreadsheet editor with parsed data
-        navigate('/spreadsheet-editor', { 
-          state: { parsedData: json, fileName: file.name } 
+
+        // Convert all numeric values to full strings, then normalize phone numbers
+        const formattedData = json.map(row => {
+          const newRow = {};
+          Object.entries(row).forEach(([key, value]) => {
+            if (typeof value === 'number') {
+              newRow[key] = value.toLocaleString('fullwide', { useGrouping: false });
+            } else {
+              newRow[key] = value;
+            }
+          });
+
+          // Normalize phone number column if it exists
+          const phoneKey = Object.keys(newRow).find(k => k.toLowerCase().includes('phone'));
+          if (phoneKey && newRow[phoneKey]) {
+            newRow[phoneKey] = normalizePhone(newRow[phoneKey]);
+          }
+
+          return newRow;
+        });
+
+        // Navigate to spreadsheet editor with parsed and cleaned data
+        navigate('/spreadsheet-editor', {
+          state: { parsedData: formattedData, fileName: file.name },
         });
       } catch (err) {
         showToast('error', 'Parse Error', 'Could not parse file. Ensure it has headers and data rows.');

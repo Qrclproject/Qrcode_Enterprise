@@ -34,3 +34,25 @@ export const formatPhone = (phone) => {
 
 export const capitalize = (str) =>
   str.charAt(0).toUpperCase() + str.slice(1);
+
+// ✅ NEW: Convert scientific notation (e.g., 2.34806E+12) to full numeric string
+export const convertScientificNotation = (value) => {
+  if (typeof value === 'number') {
+    return value.toLocaleString('fullwide', { useGrouping: false });
+  }
+  return value;
+};
+
+// ✅ NEW: Normalize phone number to international format
+export const normalizePhone = (phone) => {
+  if (!phone) return '';
+  let cleaned = String(phone).replace(/[^\d]/g, ''); // remove all non‑digit characters
+  if (cleaned.startsWith('0')) {
+    // Assume Nigerian local number: replace leading 0 with 234
+    cleaned = '234' + cleaned.slice(1);
+  }
+  if (!cleaned.startsWith('+')) {
+    cleaned = '+' + cleaned;
+  }
+  return cleaned;
+};
