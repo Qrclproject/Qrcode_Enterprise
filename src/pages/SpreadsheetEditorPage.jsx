@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';   // 👈 import XLSX for download
 
 export default function SpreadsheetEditorPage() {
   const location = useLocation();
@@ -8,7 +9,7 @@ export default function SpreadsheetEditorPage() {
   const [columns, setColumns] = useState([]);
   const [fileName, setFileName] = useState('');
   const [restoreState, setRestoreState] = useState(null);
-  // ─── Fill values per column ──────────────────────────────────
+  // Fill values per column
   const [fillValues, setFillValues] = useState({});
 
   useEffect(() => {
@@ -89,8 +90,20 @@ export default function SpreadsheetEditorPage() {
     if (!col || !value.trim()) return;
     const updated = data.map(row => ({ ...row, [col]: value.trim() }));
     setData(updated);
-    // Clear the fill input for this column
     setFillValues(prev => ({ ...prev, [col]: '' }));
+  };
+
+  // ─── Download current sheet as Excel ─────────────────────────
+  const handleDownload = () => {
+    if (!data.length) {
+      alert('No data to download.');
+      return;
+    }
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    const saveFileName = fileName ? fileName.replace(/\.[^.]+$/, '') + '_edited.xlsx' : 'edited_sheet.xlsx';
+    XLSX.writeFile(workbook, saveFileName);
   };
 
   // ─── Save and go to Campaign Builder ──────────────────────────
@@ -112,7 +125,7 @@ export default function SpreadsheetEditorPage() {
   return (
     <div className="flex-1 overflow-y-auto p-5">
       <div className="max-w-full mx-auto space-y-4">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
               <i className="fas fa-edit text-orange-500"></i> Edit Spreadsheet
@@ -121,7 +134,7 @@ export default function SpreadsheetEditorPage() {
               {fileName} · {data.length} rows · {columns.length} columns
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={addRow}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-blue-700"
@@ -133,6 +146,13 @@ export default function SpreadsheetEditorPage() {
               className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-green-700"
             >
               + Add Column
+            </button>
+            <button
+              onClick={handleDownload}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-gray-700"
+              title="Download current sheet to your device"
+            >
+              <i className="fas fa-download mr-1"></i> Download
             </button>
             <div className="flex gap-2">
               <button
@@ -154,7 +174,7 @@ export default function SpreadsheetEditorPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
           <table className="min-w-full text-xs text-left">
             <thead className="bg-gray-50 border-b">
-              {/* ─── Row 1: Column names ─────────────────────────── */}
+              {/* Column names */}
               <tr>
                 <th className="px-3 py-2 w-8">#</th>
                 {columns.map((col) => (
@@ -177,7 +197,7 @@ export default function SpreadsheetEditorPage() {
                 <th className="px-3 py-2 w-8">Actions</th>
               </tr>
 
-              {/* ─── Row 2: Auto‑fill inputs ────────────────────── */}
+              {/* Auto‑fill inputs */}
               <tr className="bg-gray-50/80">
                 <td className="px-3 py-1 text-gray-400 text-[10px] font-medium text-center">
                   <i className="fas fa-fill-drip"></i>
@@ -197,7 +217,6 @@ export default function SpreadsheetEditorPage() {
                         }}
                         placeholder="Fill all rows"
                         className="w-full border border-gray-200 rounded px-1 py-0.5 text-xs focus:border-blue-400 outline-none"
-                        title="Enter a value and press Enter to fill all rows in this column"
                       />
                       <button
                         onClick={() => fillColumn(col, fillValues[col] || '')}
