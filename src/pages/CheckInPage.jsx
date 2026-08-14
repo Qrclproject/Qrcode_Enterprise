@@ -138,9 +138,9 @@ export default function CheckInPage() {
       setAttendee(recipient);
       setResult({
         success: true,
-        message: `✅ ${recipient.name || 'Attendee'} checked in successfully!`,
+        message: `✅ Attendee checked in successfully!`,
       });
-      showToast('success', 'Checked In', `${recipient.name || 'Attendee'} has been admitted.`);
+      showToast('success', 'Checked In', 'Attendee has been admitted.');
       fetchScanHistory();
     } catch (err) {
       const msg = err.response?.data?.message || err.message;
@@ -186,12 +186,13 @@ export default function CheckInPage() {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
-  // ─── Helper to build a list of attendee fields to display (NO phone) ──
+  // ─── Helper to build a list of attendee fields to display (NO phone, NO generic name) ──
   const getAttendeeFields = (attendee) => {
     if (!attendee) return [];
     const fields = [];
     const excludedKeys = [
-      '_id', '__v', 'checkedIn', 'checkedInAt', 'status', 'qrUrl', 'qrDataFields', 'phone'
+      '_id', '__v', 'checkedIn', 'checkedInAt', 'status', 'qrUrl', 'qrDataFields',
+      'phone', 'name'   // exclude both phone and name entirely
     ];
 
     // If QR Data Content exists, show those first
@@ -221,11 +222,6 @@ export default function CheckInPage() {
       return nameField.value || 'Attendee';
     }
     return 'Attendee';
-  };
-
-  const getHistorySecondaryText = (scan) => {
-    // We intentionally do not show phone
-    return '';
   };
 
   const getHistoryBadgeText = (scan) => {
