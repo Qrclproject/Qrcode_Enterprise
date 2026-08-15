@@ -8,6 +8,10 @@ export const launchCampaign = (campaignId) => {
   console.log('📤 Sending POST /campaigns/launch with body:', { campaignId });
   return api.post('/campaigns/launch', { campaignId });
 };
+export const sendManualMessage = (campaignId, phone, variables) =>
+  api.post(`/campaigns/${campaignId}/send-manual`, { phone, variables });
+export const resetRecipientCheckIn = (campaignId, recipientId) =>
+  api.post(`/campaigns/${campaignId}/recipients/${recipientId}/reset-checkin`);
 // Get paginated campaign history (used by Sent History page)
 export const getCampaignHistory = (params) =>
   api.get('/campaigns/history', { params });

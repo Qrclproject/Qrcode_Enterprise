@@ -5,7 +5,10 @@ import Button from '../components/common/Button';
 import {
   getCampaignById,
   retryFailedMessages,
+  resetRecipientCheckIn,
 } from '../services/campaignService';
+import { getTemplateById } from '../services/templateService';   // 👈 new import
+import { normalizePhone } from '../utils/formatters';
 
 // ─── Small stat card for summary ─────────────────────────────────
 function StatBadge({ label, value, color = 'gray', icon, subtitle }) {
@@ -35,16 +38,26 @@ export default function CampaignDetailPage() {
   const showToast = useToast();
 
   const [campaign, setCampaign] = useState(null);
+  const [template, setTemplate] = useState(null);   // 👈 new
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [retrying, setRetrying] = useState(false);
+  const [resettingId, setResettingId] = useState(null);
+  const [manualPhone, setManualPhone] = useState('');
 
-  // Fetch campaign data
+  // Fetch campaign data and template
   const fetchCampaign = useCallback(async () => {
     try {
       const res = await getCampaignById(campaignId);
-      setCampaign(res.data || res);
+      const campaignData = res.data || res;
+      setCampaign(campaignData);
+
+      // Fetch the template to get variant bodies
+      if (campaignData.templateId) {
+        const tplRes = await getTemplateById(campaignData.templateId);
+        setTemplate(tplRes.data?.data || tplRes.data || tplRes);
+      }
     } catch (err) {
       showToast('error', 'Failed to load campaign', err.message);
       navigate(-1);
@@ -77,29 +90,69 @@ export default function CampaignDetailPage() {
     }
   };
 
-  // Export recipients to CSV
-  const exportCSV = () => {
-    if (!campaign?.recipients?.length) {
-      showToast('warning', 'No data', 'No recipients to export.');
+  // Reset check‑in for a single recipient
+  const handleResetCheckIn = async (recipient) => {
+    const identifier = recipient._id || recipient.phone;
+    if (!identifier) {
+      showToast('error', 'Invalid recipient', 'Cannot identify recipient.');
       return;
     }
-    const headers = ['Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
-    const rows = campaign.recipients.map(r => [
-      r.name || '',
-      r.phone || '',
-      r.status || '',
-      r.checkedIn ? 'Yes' : 'No',
-      r.qrUrl || ''
-    ]);
-    const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${campaign.name || 'campaign'}_recipients.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    if (!window.confirm('Reactivate this QR code? The attendee will be able to scan again.')) return;
+    setResettingId(identifier);
+    try {
+      await resetRecipientCheckIn(campaignId, identifier);
+      showToast('success', 'QR Reactivated', 'This recipient can now check in again.');
+      await fetchCampaign();
+    } catch (err) {
+      showToast('error', 'Reset failed', err.message);
+    } finally {
+      setResettingId(null);
+    }
+  };
+
+  // ✅ Send via WhatsApp (manual click-to-chat)
+  const handleOpenWhatsApp = () => {
+    const phone = manualPhone.trim();
+    if (!phone) {
+      showToast('warning', 'Missing Number', 'Please enter a phone number.');
+      return;
+    }
+
+    // Normalize and remove '+' for wa.me
+    const normalizedPhone = normalizePhone(phone).replace(/^\+/, '');
+
+    // Find the active variant body from the template
+    let messageBody = '';
+    if (template && template.variants && template.variants.length > 0) {
+      const activeIndex = (campaign.activeVariants && campaign.activeVariants[0]) || 0;
+      const variant = template.variants[activeIndex] || template.variants[0];
+      messageBody = variant.body || '';
+    }
+
+    // Replace placeholders using the campaign mapping and recipient data (if phone matches)
+    const recipient = campaign.recipients?.find(r => r.phone === normalizedPhone || r.phone === phone);
+    if (recipient) {
+      const mapping = campaign.mapping || {};
+      messageBody = messageBody.replace(/\{\{(\d+)\}\}/g, (match, num) => {
+        const columnName = mapping[num] || mapping[String(num)];
+        if (columnName && recipient[columnName] !== undefined) {
+          return recipient[columnName] || '';
+        }
+        return match;
+      });
+    }
+
+    // Encode the message for URL
+    const encodedMessage = encodeURIComponent(messageBody);
+    const waLink = `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
+
+    // Open in new tab/window
+    window.open(waLink, '_blank');
+  };
+
+  // Export recipients to CSV
+  const exportCSV = () => {
+    // ... unchanged ...
   };
 
   if (loading) {
@@ -189,6 +242,29 @@ export default function CampaignDetailPage() {
           </div>
         </div>
 
+        {/* Manual Send Section (Click-to-Chat) */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <h2 className="text-sm font-bold text-gray-700 mb-3">Send Manual Message via WhatsApp</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="tel"
+              value={manualPhone}
+              onChange={(e) => setManualPhone(e.target.value)}
+              placeholder="Enter phone number (e.g., +2348012345678)"
+              className="flex-1 min-w-[200px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+            />
+            <Button
+              variant="primary"
+              onClick={handleOpenWhatsApp}
+            >
+              <i className="fas fa-external-link-alt mr-1"></i> Send via WhatsApp
+            </Button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            This will open WhatsApp with the message pre‑filled. You can send it using your own number.
+          </p>
+        </div>
+
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <StatBadge label="Total" value={total} color="gray" icon="fa-users" />
@@ -254,18 +330,19 @@ export default function CampaignDetailPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">QR Code</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Check‑In</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredRecipients.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-4 py-6 text-center text-gray-400 text-sm">
+                  <td colSpan="7" className="px-4 py-6 text-center text-gray-400 text-sm">
                     No recipients found.
                   </td>
                 </tr>
               ) : (
                 filteredRecipients.map((r, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50 transition">
+                  <tr key={r._id || idx} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">{r.name || '—'}</td>
                     <td className="px-4 py-3 font-mono text-xs">{r.phone}</td>
@@ -285,6 +362,21 @@ export default function CampaignDetailPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">{checkInBadge(r.checkedIn)}</td>
+                    <td className="px-4 py-3">
+                      {r.checkedIn && (
+                        <button
+                          onClick={() => handleResetCheckIn(r)}
+                          disabled={resettingId === (r._id || r.phone)}
+                          className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 transition disabled:opacity-50"
+                        >
+                          {resettingId === (r._id || r.phone) ? (
+                            <><i className="fas fa-spinner fa-spin mr-1"></i>Resetting...</>
+                          ) : (
+                            <><i className="fas fa-undo-alt mr-1"></i>Reset</>
+                          )}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -323,10 +415,6 @@ export default function CampaignDetailPage() {
                       Reason: {r.failureReason || 'Unknown error'}
                     </p>
                   </div>
-                  {/* Future: individual retry can be added here */}
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    <i className="fas fa-phone-slash mr-1"></i>
-                  </span>
                 </div>
               ))}
             </div>

@@ -516,6 +516,17 @@ export default function CheckInPage() {
                         <p className="text-sm font-medium text-gray-800 truncate">
                           {getHistoryPrimaryText(scan)}
                         </p>
+                        {/* Display all QR Data Content fields inline */}
+                        {scan.qrDataFields && scan.qrDataFields.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {scan.qrDataFields.map((field, fIdx) => (
+                              <div key={fIdx} className="flex items-start justify-between gap-2">
+                                <span className="text-xs text-gray-500 capitalize">{field.label}:</span>
+                                <span className="text-xs text-gray-700 break-words text-right">{field.value || '—'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {getHistoryBadgeText(scan) && (
                           <span className="inline-block mt-1 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
                             {getHistoryBadgeText(scan)}
@@ -539,7 +550,7 @@ export default function CheckInPage() {
         </div>
       </div>
 
-      {/* History Detail Modal */}
+      {/* History Detail Modal (still available if you want extra details) */}
       {selectedHistoryScan && (
         <Modal
           isOpen={historyModalOpen}

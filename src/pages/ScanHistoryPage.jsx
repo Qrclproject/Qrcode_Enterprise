@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Modal from '../components/common/Modal';
 import { useToast } from '../components/layout/Toast';
 import api from '../services/api';
+import * as XLSX from 'xlsx';   // for Excel export
 
 export default function ScanHistoryPage() {
   const { campaignId } = useParams();
@@ -60,8 +61,7 @@ export default function ScanHistoryPage() {
   }, [fetchHistory]);
 
   const handleSearch = (e) => {
-    e.preventDefault(); // prevent page reload
-    // Manual search trigger if needed
+    e.preventDefault();
     setDebouncedSearch(search);
     setPage(1);
   };
@@ -85,17 +85,160 @@ export default function ScanHistoryPage() {
   // Helper to get attendee display name without phone
   const getAttendeeDisplay = (scan) => {
     if (scan.qrDataFields && scan.qrDataFields.length > 0) {
-      // Prefer a field labeled "name" if available, otherwise use the first field
       const nameField = scan.qrDataFields.find(f => f.label.toLowerCase().includes('name')) || scan.qrDataFields[0];
       return nameField.value || 'Attendee';
     }
     return 'Attendee';
   };
 
-  // Apply status filter client-side (optional, could also be backend)
+  // Apply status filter client-side
   const filteredHistory = statusFilter === 'all'
     ? history
     : history.filter(scan => scan.status === statusFilter);
+
+  // ─── Export helpers ─────────────────────────────────────────────
+  const getExportData = () => {
+    return filteredHistory.map(scan => {
+      const row = {
+        Attendee: getAttendeeDisplay(scan),
+        Status: scan.status,
+        Time: new Date(scan.timestamp).toLocaleString(),
+      };
+      if (scan.qrDataFields && scan.qrDataFields.length > 0) {
+        scan.qrDataFields.forEach(field => {
+          row[field.label] = field.value || '';
+        });
+      }
+      return row;
+    });
+  };
+
+  const getHeaders = () => {
+    const data = getExportData();
+    return Array.from(new Set(data.flatMap(obj => Object.keys(obj))));
+  };
+
+  const escapeCsv = (value) => {
+    if (value == null) return '';
+    const str = String(value);
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const exportCSV = () => {
+    const data = getExportData();
+    if (data.length === 0) {
+      showToast('warning', 'No data', 'Nothing to export.');
+      return;
+    }
+    const headers = getHeaders();
+    const csvContent = [
+      headers.map(escapeCsv).join(','),
+      ...data.map(row => headers.map(h => escapeCsv(row[h] ?? '')).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `scan_history_${campaignId}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    showToast('success', 'CSV exported', 'Download started.');
+  };
+
+  const exportExcel = () => {
+    const data = getExportData();
+    if (data.length === 0) {
+      showToast('warning', 'No data', 'Nothing to export.');
+      return;
+    }
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'ScanHistory');
+    XLSX.writeFile(workbook, `scan_history_${campaignId}.xlsx`);
+    showToast('success', 'Excel exported', 'Download started.');
+  };
+
+  // ─── PDF Export via print dialog ─────────────────────────────
+  const exportPDF = () => {
+    const data = getExportData();
+    if (data.length === 0) {
+      showToast('warning', 'No data', 'Nothing to export.');
+      return;
+    }
+
+    const headers = getHeaders();
+    let html = `
+      <html>
+        <head>
+          <title>Scan History</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { font-size: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+            th { background-color: #f2f2f2; }
+          </style>
+        </head>
+        <body>
+          <h1>Scan History - ${campaignId}</h1>
+          <table>
+            <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+            <tbody>
+              ${data.map(row => `<tr>${headers.map(h => `<td>${row[h] ?? ''}</td>`).join('')}</tr>`).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      showToast('error', 'Popup blocked', 'Allow popups to export PDF.');
+      return;
+    }
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  // ─── DOC Export (Word-compatible HTML) ───────────────────────
+  const exportDOC = () => {
+    const data = getExportData();
+    if (data.length === 0) {
+      showToast('warning', 'No data', 'Nothing to export.');
+      return;
+    }
+
+    const headers = getHeaders();
+    let html = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset="utf-8">
+        <title>Scan History</title>
+        <style>
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #000; padding: 8px; }
+        </style>
+      </head>
+      <body>
+        <h1>Scan History - ${campaignId}</h1>
+        <table>
+          <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+          ${data.map(row => `<tr>${headers.map(h => `<td>${row[h] ?? ''}</td>`).join('')}</tr>`).join('')}
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `scan_history_${campaignId}.doc`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    showToast('success', 'DOC exported', 'Download started.');
+  };
 
   if (loading) {
     return (
@@ -112,12 +255,38 @@ export default function ScanHistoryPage() {
           <h1 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
             <i className="fas fa-history text-orange-500"></i> Scan History
           </h1>
-          <button
-            onClick={() => navigate(-1)}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
-            ← Back
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={exportCSV}
+              className="text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium transition"
+            >
+              <i className="fas fa-file-csv mr-1"></i> CSV
+            </button>
+            <button
+              onClick={exportExcel}
+              className="text-sm bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-medium transition"
+            >
+              <i className="fas fa-file-excel mr-1"></i> Excel
+            </button>
+            <button
+              onClick={exportPDF}
+              className="text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg font-medium transition"
+            >
+              <i className="fas fa-file-pdf mr-1"></i> PDF
+            </button>
+            <button
+              onClick={exportDOC}
+              className="text-sm bg-purple-500 hover:bg-purple-600 text-white px-3 py-1.5 rounded-lg font-medium transition"
+            >
+              <i className="fas fa-file-word mr-1"></i> DOC
+            </button>
+            <button
+              onClick={() => navigate(-1)}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              ← Back
+            </button>
+          </div>
         </div>
 
         {/* Search & Filters */}
