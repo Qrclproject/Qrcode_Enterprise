@@ -7,7 +7,7 @@ import {
   retryFailedMessages,
   resetRecipientCheckIn,
 } from '../services/campaignService';
-import { getTemplateById } from '../services/templateService';   // 👈 new import
+import { getTemplateById } from '../services/templateService';
 import { normalizePhone } from '../utils/formatters';
 
 // ─── Small stat card for summary ─────────────────────────────────
@@ -38,7 +38,7 @@ export default function CampaignDetailPage() {
   const showToast = useToast();
 
   const [campaign, setCampaign] = useState(null);
-  const [template, setTemplate] = useState(null);   // 👈 new
+  const [template, setTemplate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -53,7 +53,6 @@ export default function CampaignDetailPage() {
       const campaignData = res.data || res;
       setCampaign(campaignData);
 
-      // Fetch the template to get variant bodies
       if (campaignData.templateId) {
         const tplRes = await getTemplateById(campaignData.templateId);
         setTemplate(tplRes.data?.data || tplRes.data || tplRes);
@@ -110,64 +109,81 @@ export default function CampaignDetailPage() {
     }
   };
 
-  // ✅ Send via WhatsApp (manual click-to-chat)
-// ✅ Send via WhatsApp (manual click-to-chat)
-const handleOpenWhatsApp = () => {
-  const phone = manualPhone.trim();
-  if (!phone) {
-    showToast('warning', 'Missing Number', 'Please enter a phone number.');
-    return;
-  }
+  // ✅ Open WhatsApp with pre‑filled message and image URL if available
+  const openWhatsAppForRecipient = (phone, recipientData = null) => {
+    const normalizedPhone = normalizePhone(phone).replace(/^\+/, '');
 
-  // Normalize and remove '+' for wa.me
-  const normalizedPhone = normalizePhone(phone).replace(/^\+/, '');
+    // Determine message body
+    let messageBody = '';
+    if (template && template.variants && template.variants.length > 0) {
+      const activeIndex = (campaign.activeVariants && campaign.activeVariants[0]) || 0;
+      const variant = template.variants[activeIndex] || template.variants[0];
+      messageBody = variant.body || '';
+    }
 
-  // Find the active variant body from the template
-  let messageBody = '';
-  if (template && template.variants && template.variants.length > 0) {
-    const activeIndex = (campaign.activeVariants && campaign.activeVariants[0]) || 0;
-    const variant = template.variants[activeIndex] || template.variants[0];
-    messageBody = variant.body || '';
-  }
+    // Replace placeholders using campaign mapping and recipient data
+    if (recipientData) {
+      const mapping = campaign.mapping || {};
+      messageBody = messageBody.replace(/\{\{(\d+)\}\}/g, (match, num) => {
+        const columnName = mapping[num] || mapping[String(num)];
+        if (columnName && recipientData[columnName] !== undefined) {
+          return recipientData[columnName] || '';
+        }
+        return match;
+      });
+    }
 
-  // Try to find the recipient (to get their QR URL and other data)
-  const recipient = campaign.recipients?.find(r => r.phone === normalizedPhone || r.phone === phone || r.phone === '+' + phone);
+    // Build final message: image URL first if available and header image enabled
+    let finalMessage = '';
+    const imageUrl = recipientData?.qrUrl || campaign.headerImageUrl || '';
+    if (imageUrl && campaign.includeHeaderImage) {
+      finalMessage = `${imageUrl}\n\n${messageBody}`;
+    } else {
+      finalMessage = messageBody;
+    }
 
-  // Replace placeholders using the campaign mapping and recipient data
-  if (recipient) {
-    const mapping = campaign.mapping || {};
-    messageBody = messageBody.replace(/\{\{(\d+)\}\}/g, (match, num) => {
-      const columnName = mapping[num] || mapping[String(num)];
-      if (columnName && recipient[columnName] !== undefined) {
-        return recipient[columnName] || '';
-      }
-      return match;
-    });
-  }
+    const encodedMessage = encodeURIComponent(finalMessage);
+    const waLink = `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
+    window.open(waLink, '_blank');
+  };
 
-  // Build full message with image URL if available
-  let finalMessage = '';
+  // Manual send from input
+  const handleOpenWhatsAppManual = () => {
+    const phone = manualPhone.trim();
+    if (!phone) {
+      showToast('warning', 'Missing Number', 'Please enter a phone number.');
+      return;
+    }
+    // Try to find recipient by phone
+    const recipient = campaign.recipients?.find(
+      r => r.phone === phone || r.phone === '+' + phone || r.phone === phone.replace(/^\+/, '')
+    );
+    openWhatsAppForRecipient(phone, recipient);
+  };
 
-  // Prefer recipient QR URL (if exists), otherwise static header image
-  const imageUrl = recipient?.qrUrl || campaign.headerImageUrl || '';
-
-  if (imageUrl && campaign.includeHeaderImage) {
-    // Add image URL as first line, then a blank line, then the message body
-    finalMessage = `${imageUrl}\n\n${messageBody}`;
-  } else {
-    finalMessage = messageBody;
-  }
-
-  // Encode the message for URL
-  const encodedMessage = encodeURIComponent(finalMessage);
-  const waLink = `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
-
-  // Open in new tab/window
-  window.open(waLink, '_blank');
-};
   // Export recipients to CSV
   const exportCSV = () => {
-    // ... unchanged ...
+    if (!campaign?.recipients?.length) {
+      showToast('warning', 'No data', 'No recipients to export.');
+      return;
+    }
+    const headers = ['Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
+    const rows = campaign.recipients.map(r => [
+      r.name || '',
+      r.phone || '',
+      r.status || '',
+      r.checkedIn ? 'Yes' : 'No',
+      r.qrUrl || ''
+    ]);
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${campaign.name || 'campaign'}_recipients.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
 
   if (loading) {
@@ -257,7 +273,7 @@ const handleOpenWhatsApp = () => {
           </div>
         </div>
 
-        {/* Manual Send Section (Click-to-Chat) */}
+        {/* Manual Send Section */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <h2 className="text-sm font-bold text-gray-700 mb-3">Send Manual Message via WhatsApp</h2>
           <div className="flex flex-wrap items-center gap-2">
@@ -268,15 +284,12 @@ const handleOpenWhatsApp = () => {
               placeholder="Enter phone number (e.g., +2348012345678)"
               className="flex-1 min-w-[200px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
             />
-            <Button
-              variant="primary"
-              onClick={handleOpenWhatsApp}
-            >
+            <Button variant="primary" onClick={handleOpenWhatsAppManual}>
               <i className="fas fa-external-link-alt mr-1"></i> Send via WhatsApp
             </Button>
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            This will open WhatsApp with the message pre‑filled. You can send it using your own number.
+            Or use the per‑recipient buttons in the table below.
           </p>
         </div>
 
@@ -345,7 +358,7 @@ const handleOpenWhatsApp = () => {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">QR Code</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Check‑In</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -378,19 +391,31 @@ const handleOpenWhatsApp = () => {
                     </td>
                     <td className="px-4 py-3">{checkInBadge(r.checkedIn)}</td>
                     <td className="px-4 py-3">
-                      {r.checkedIn && (
+                      <div className="flex items-center justify-end gap-2">
+                        {/* Send via WhatsApp button */}
                         <button
-                          onClick={() => handleResetCheckIn(r)}
-                          disabled={resettingId === (r._id || r.phone)}
-                          className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 transition disabled:opacity-50"
+                          onClick={() => openWhatsAppForRecipient(r.phone, r)}
+                          className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition"
+                          title="Send message via WhatsApp"
                         >
-                          {resettingId === (r._id || r.phone) ? (
-                            <><i className="fas fa-spinner fa-spin mr-1"></i>Resetting...</>
-                          ) : (
-                            <><i className="fas fa-undo-alt mr-1"></i>Reset</>
-                          )}
+                          <i className="fab fa-whatsapp mr-1"></i> Send
                         </button>
-                      )}
+
+                        {/* Reset button (only if checked in) */}
+                        {r.checkedIn && (
+                          <button
+                            onClick={() => handleResetCheckIn(r)}
+                            disabled={resettingId === (r._id || r.phone)}
+                            className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 transition disabled:opacity-50"
+                          >
+                            {resettingId === (r._id || r.phone) ? (
+                              <><i className="fas fa-spinner fa-spin mr-1"></i>Resetting...</>
+                            ) : (
+                              <><i className="fas fa-undo-alt mr-1"></i>Reset</>
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
