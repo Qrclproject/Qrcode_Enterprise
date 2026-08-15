@@ -111,45 +111,60 @@ export default function CampaignDetailPage() {
   };
 
   // ✅ Send via WhatsApp (manual click-to-chat)
-  const handleOpenWhatsApp = () => {
-    const phone = manualPhone.trim();
-    if (!phone) {
-      showToast('warning', 'Missing Number', 'Please enter a phone number.');
-      return;
-    }
+// ✅ Send via WhatsApp (manual click-to-chat)
+const handleOpenWhatsApp = () => {
+  const phone = manualPhone.trim();
+  if (!phone) {
+    showToast('warning', 'Missing Number', 'Please enter a phone number.');
+    return;
+  }
 
-    // Normalize and remove '+' for wa.me
-    const normalizedPhone = normalizePhone(phone).replace(/^\+/, '');
+  // Normalize and remove '+' for wa.me
+  const normalizedPhone = normalizePhone(phone).replace(/^\+/, '');
 
-    // Find the active variant body from the template
-    let messageBody = '';
-    if (template && template.variants && template.variants.length > 0) {
-      const activeIndex = (campaign.activeVariants && campaign.activeVariants[0]) || 0;
-      const variant = template.variants[activeIndex] || template.variants[0];
-      messageBody = variant.body || '';
-    }
+  // Find the active variant body from the template
+  let messageBody = '';
+  if (template && template.variants && template.variants.length > 0) {
+    const activeIndex = (campaign.activeVariants && campaign.activeVariants[0]) || 0;
+    const variant = template.variants[activeIndex] || template.variants[0];
+    messageBody = variant.body || '';
+  }
 
-    // Replace placeholders using the campaign mapping and recipient data (if phone matches)
-    const recipient = campaign.recipients?.find(r => r.phone === normalizedPhone || r.phone === phone);
-    if (recipient) {
-      const mapping = campaign.mapping || {};
-      messageBody = messageBody.replace(/\{\{(\d+)\}\}/g, (match, num) => {
-        const columnName = mapping[num] || mapping[String(num)];
-        if (columnName && recipient[columnName] !== undefined) {
-          return recipient[columnName] || '';
-        }
-        return match;
-      });
-    }
+  // Try to find the recipient (to get their QR URL and other data)
+  const recipient = campaign.recipients?.find(r => r.phone === normalizedPhone || r.phone === phone || r.phone === '+' + phone);
 
-    // Encode the message for URL
-    const encodedMessage = encodeURIComponent(messageBody);
-    const waLink = `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
+  // Replace placeholders using the campaign mapping and recipient data
+  if (recipient) {
+    const mapping = campaign.mapping || {};
+    messageBody = messageBody.replace(/\{\{(\d+)\}\}/g, (match, num) => {
+      const columnName = mapping[num] || mapping[String(num)];
+      if (columnName && recipient[columnName] !== undefined) {
+        return recipient[columnName] || '';
+      }
+      return match;
+    });
+  }
 
-    // Open in new tab/window
-    window.open(waLink, '_blank');
-  };
+  // Build full message with image URL if available
+  let finalMessage = '';
 
+  // Prefer recipient QR URL (if exists), otherwise static header image
+  const imageUrl = recipient?.qrUrl || campaign.headerImageUrl || '';
+
+  if (imageUrl && campaign.includeHeaderImage) {
+    // Add image URL as first line, then a blank line, then the message body
+    finalMessage = `${imageUrl}\n\n${messageBody}`;
+  } else {
+    finalMessage = messageBody;
+  }
+
+  // Encode the message for URL
+  const encodedMessage = encodeURIComponent(finalMessage);
+  const waLink = `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
+
+  // Open in new tab/window
+  window.open(waLink, '_blank');
+};
   // Export recipients to CSV
   const exportCSV = () => {
     // ... unchanged ...
