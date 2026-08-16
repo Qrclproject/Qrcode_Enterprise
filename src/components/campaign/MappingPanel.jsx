@@ -1,7 +1,5 @@
-// src/components/campaign/MappingPanel.jsx
 import { useState } from 'react';
 
-// ─── Helper: extract placeholder numbers from a string ──────────
 const extractPlaceholders = (body) => {
   const matches = body.match(/{{(\d+)}}/g) || [];
   return matches.map(m => parseInt(m.match(/\d+/)[0], 10)).sort((a, b) => a - b);
@@ -19,18 +17,14 @@ export default function MappingPanel({
   toggleVariant,
   customMessage,
   setCustomMessage,
-  // ─── QR-specific props (only shown when QR is ON and design selected) ───
-  qrDataFields = [],          // placeholder keys for QR data (e.g., ["1", "2"])
-  textOverlayPlaceholders = [], // placeholder keys for text overlays (e.g., ["name", "event"])
-  showQrFields = false,       // whether to show QR-specific sections
+  qrDataFields = [],
+  textOverlayPlaceholders = [],
+  showQrFields = false,
 }) {
   const tplDef = templateDefinitions[template];
-
-  // Get variant placeholders
   const activeVariant = tplDef?.variants?.find(v => v.active) || tplDef?.variants?.[0];
   const variantPlaceholders = activeVariant ? extractPlaceholders(activeVariant.body) : [];
 
-  // Helper to render a dropdown for a placeholder key
   const renderPlaceholderDropdown = (key, labelPrefix) => {
     const label = labelPrefix || `Placeholder ${key}`;
     return (
@@ -45,7 +39,7 @@ export default function MappingPanel({
             newPlaceholders[key] = e.target.value;
             setMapping({ ...mapping, placeholders: newPlaceholders });
           }}
-          className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
+          className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
         >
           <option value="">-- Select Column --</option>
           {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
@@ -65,7 +59,7 @@ export default function MappingPanel({
           <select
             value={mapping.phone || ''}
             onChange={(e) => setMapping({ ...mapping, phone: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
+            className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
           >
             <option value="">-- Select Column --</option>
             {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
@@ -78,7 +72,7 @@ export default function MappingPanel({
           <select
             value={mapping.qr || ''}
             onChange={(e) => setMapping({ ...mapping, qr: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
+            className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
           >
             <option value="">-- Select Column --</option>
             {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
@@ -93,7 +87,7 @@ export default function MappingPanel({
           </div>
         )}
 
-        {/* ─── QR DATA FIELDS (only when QR is ON and design selected) ─── */}
+        {/* ─── QR DATA FIELDS ─── */}
         {showQrFields && qrDataFields.length > 0 && (
           <div className="border-t pt-3">
             <h4 className="text-[10px] font-semibold text-orange-600 uppercase">
@@ -106,7 +100,7 @@ export default function MappingPanel({
           </div>
         )}
 
-        {/* ─── TEXT OVERLAYS (only when QR is ON and design selected) ─── */}
+        {/* ─── TEXT OVERLAYS ─── */}
         {showQrFields && textOverlayPlaceholders.length > 0 && (
           <div className="border-t pt-3">
             <h4 className="text-[10px] font-semibold text-green-600 uppercase">
@@ -125,7 +119,7 @@ export default function MappingPanel({
           <select
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
-            className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 font-medium"
+            className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 font-medium focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
           >
             {templates.map(t => (
               <option key={t.id} value={t.id}>
@@ -149,7 +143,7 @@ export default function MappingPanel({
                     key={idx}
                     onClick={() => toggleVariant(template, idx)}
                     className={`variant-pill px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                      isActive ? 'active' : 'bg-gray-100 text-gray-400'
+                      isActive ? 'active' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                     }`}
                   >
                     {v.label} {isActive ? '✓' : ''}
@@ -158,7 +152,7 @@ export default function MappingPanel({
               })}
             </div>
             <p className="text-[9px] text-gray-400 mt-0.5">
-              Each recipient randomly gets one of the <strong className="text-blue-600">blue</strong> variants.
+              Each recipient randomly gets one of the <strong className="text-orange-600">active</strong> variants.
             </p>
           </div>
         )}
@@ -169,7 +163,7 @@ export default function MappingPanel({
             <textarea
               value={customMessage}
               onChange={(e) => setCustomMessage(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg p-2 text-xs resize-none h-16"
+              className="w-full border border-gray-200 rounded-lg p-2 text-xs resize-none h-16 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
               placeholder="Type custom message... Use {{1}} {{2}} {{3}} for variables."
             />
             <div className="text-[10px] text-gray-400 text-right">{customMessage.length}/1024</div>

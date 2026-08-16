@@ -12,17 +12,15 @@ export default function PreviewPanel({
   onNext,
   variantLabel,
   onCycleVariant,
-  // ─── CTA button props ──────────────────────────────────────────
   buttonType,
   buttonText,
   buttonValue,
-  // ─── NEW: Header image toggle ─────────────────────────────────
   headerImageUrl,
   includeHeaderImage,
   setIncludeHeaderImage,
 }) {
   return (
-    <div className="dashboard-panel p-4 bg-gray-50/80">
+    <div className="dashboard-panel p-4 bg-gradient-to-b from-gray-50 to-white">
       <div className="panel-header flex justify-between">
         <div className="flex items-center gap-2">
           <div className="panel-badge">3</div> LIVE PREVIEW
@@ -30,7 +28,7 @@ export default function PreviewPanel({
         <div className="flex items-center gap-1">
           <button
             onClick={onPrev}
-            className="text-gray-400 hover:text-gray-700 text-xs px-1.5 py-0.5 rounded"
+            className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 text-xs px-1.5 py-0.5 rounded transition-colors"
             title="Previous recipient"
           >
             <i className="fas fa-chevron-left"></i>
@@ -40,7 +38,7 @@ export default function PreviewPanel({
           </span>
           <button
             onClick={onNext}
-            className="text-gray-400 hover:text-gray-700 text-xs px-1.5 py-0.5 rounded"
+            className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 text-xs px-1.5 py-0.5 rounded transition-colors"
             title="Next recipient"
           >
             <i className="fas fa-chevron-right"></i>
@@ -48,17 +46,17 @@ export default function PreviewPanel({
           <span className="text-gray-300 mx-1">|</span>
           <button
             onClick={() => onCycleVariant(-1)}
-            className="text-gray-400 hover:text-indigo-600 text-xs px-1.5 py-0.5 rounded"
+            className="text-gray-400 hover:text-orange-600 hover:bg-orange-50 text-xs px-1.5 py-0.5 rounded transition-colors"
             title="Previous variant"
           >
             <i className="fas fa-sync-alt fa-rotate-270 text-[10px]"></i>
           </button>
-          <span className="text-[10px] text-indigo-500 font-mono">
+          <span className="text-[10px] text-orange-500 font-mono">
             {variantLabel || 'V1'}
           </span>
           <button
             onClick={() => onCycleVariant(1)}
-            className="text-gray-400 hover:text-indigo-600 text-xs px-1.5 py-0.5 rounded"
+            className="text-gray-400 hover:text-orange-600 hover:bg-orange-50 text-xs px-1.5 py-0.5 rounded transition-colors"
             title="Next variant"
           >
             <i className="fas fa-sync-alt fa-rotate-90 text-[10px]"></i>
@@ -82,7 +80,6 @@ export default function PreviewPanel({
         qrUrl={qrUrl}
         showQR={showQR}
         headerImageUrl={headerImageUrl}
-        // ─── Pass button props ──────────────────────────────────────
         buttonType={buttonType}
         buttonText={buttonText}
         buttonValue={buttonValue}
@@ -95,7 +92,7 @@ export default function PreviewPanel({
             href={qrUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] text-blue-500 underline hover:text-blue-700"
+            className="text-[10px] text-orange-500 underline hover:text-orange-700"
           >
             <i className="fas fa-external-link-alt mr-1"></i>
             View generated QR image

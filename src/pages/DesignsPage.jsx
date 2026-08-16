@@ -4,23 +4,23 @@ import Button from '../components/common/Button';
 import DesignEditor from '../components/designs/DesignEditor';
 import { getDesigns, deleteDesign } from '../services/designService';
 
-// ─── Small stat card component ──────────────────────────────────
+// ─── Small stat card component with gradient styles ────────────
 function StatCard({ label, value, icon, color = 'gray' }) {
   const colorClasses = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    green: 'bg-green-50 text-green-700 border-green-200',
-    orange: 'bg-orange-50 text-orange-700 border-orange-200',
-    gray: 'bg-gray-50 text-gray-700 border-gray-200',
+    blue: 'from-blue-500 to-blue-600 text-white shadow-blue-200',
+    green: 'from-emerald-500 to-emerald-600 text-white shadow-emerald-200',
+    orange: 'from-orange-500 to-orange-600 text-white shadow-orange-200',
+    gray: 'from-gray-500 to-gray-600 text-white shadow-gray-200',
   };
 
   return (
-    <div className={`rounded-xl border p-4 flex items-center gap-3 ${colorClasses[color] || colorClasses.gray}`}>
-      <div className="w-10 h-10 rounded-full bg-white/50 flex items-center justify-center">
-        <i className={`fas ${icon} text-lg`}></i>
+    <div className={`bg-gradient-to-br ${colorClasses[color] || colorClasses.gray} rounded-xl p-4 flex items-center gap-3 shadow-md hover:shadow-lg transition-shadow`}>
+      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+        <i className={`fas ${icon} text-lg text-white`}></i>
       </div>
       <div>
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-xl font-bold">{value}</p>
+        <p className="text-xs text-white/80">{label}</p>
+        <p className="text-xl font-bold text-white">{value}</p>
       </div>
     </div>
   );
@@ -55,26 +55,26 @@ function DesignCard({ design, onEdit, onDelete, onPreview }) {
   const qrDataFieldCount = design.qrDataFields?.length || 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-lg transition-all duration-200 relative group">
+    <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-xl hover:border-orange-200 transition-all duration-200 relative group flex flex-col">
       {/* Action buttons – always visible on mobile, hover on desktop */}
       <div className="absolute top-3 right-3 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => onPreview(design.imageUrl)}
-          className="p-2 bg-white rounded-full shadow text-gray-500 hover:text-blue-600"
+          className="p-2 bg-white rounded-full shadow text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors"
           title="Preview full image"
         >
           <i className="fas fa-expand text-xs"></i>
         </button>
         <button
           onClick={() => onEdit(design)}
-          className="p-2 bg-white rounded-full shadow text-gray-500 hover:text-blue-600"
+          className="p-2 bg-white rounded-full shadow text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors"
           title="Edit design"
         >
           <i className="fas fa-pencil-alt text-xs"></i>
         </button>
         <button
           onClick={() => onDelete(design._id)}
-          className="p-2 bg-white rounded-full shadow text-gray-500 hover:text-red-600"
+          className="p-2 bg-white rounded-full shadow text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
           title="Delete design"
         >
           <i className="fas fa-trash-alt text-xs"></i>
@@ -99,15 +99,17 @@ function DesignCard({ design, onEdit, onDelete, onPreview }) {
       </div>
 
       {/* Design info */}
-      <h3 className="font-semibold text-sm text-gray-800 truncate">{design.name}</h3>
+      <h3 className="font-semibold text-sm text-gray-800 truncate group-hover:text-orange-700 transition-colors">
+        {design.name}
+      </h3>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-gray-500">
         <span className="bg-gray-100 px-2 py-0.5 rounded-full font-mono">
           QR: ({x},{y})
         </span>
-        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+        <span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full">
           <i className="fas fa-font mr-1"></i>{textOverlayCount} overlays
         </span>
-        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+        <span className="bg-green-50 text-green-700 border border-green-100 px-2 py-0.5 rounded-full">
           <i className="fas fa-qrcode mr-1"></i>{qrDataFieldCount} fields
         </span>
       </div>
@@ -138,7 +140,6 @@ export default function DesignsPage() {
 
   useEffect(() => { fetchDesigns(); }, [fetchDesigns]);
 
-  // Filter designs by search term
   const filteredDesigns = useMemo(() => {
     if (!search.trim()) return designs;
     const s = search.toLowerCase();
@@ -175,18 +176,18 @@ export default function DesignsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50">
+    <div className="flex-1 overflow-y-auto p-5 bg-gradient-to-br from-gray-50 via-white to-orange-50/30">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-wrap justify-between items-center gap-4">
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-5 shadow-lg shadow-orange-200/50 flex flex-wrap justify-between items-center gap-4">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-800 flex items-center gap-3">
-              <span className="bg-orange-100 text-orange-600 p-2 rounded-lg">
+            <h1 className="text-2xl font-extrabold text-white flex items-center gap-3">
+              <span className="bg-white/20 text-white p-2 rounded-lg">
                 <i className="fas fa-paint-brush"></i>
               </span>
               Designs
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-orange-100 text-sm mt-1">
               Create and manage custom pass designs for QR code overlays.
             </p>
           </div>
@@ -196,7 +197,7 @@ export default function DesignsPage() {
               placeholder="Search designs..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-gray-200 rounded-xl px-4 py-2 text-xs w-56 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition"
+              className="border border-white/30 bg-white/90 rounded-xl px-4 py-2 text-xs w-56 focus:border-white focus:ring-2 focus:ring-white/30 outline-none transition placeholder-gray-400"
             />
             <Button icon="plus" onClick={() => setShowEditor(true)}>New Design</Button>
           </div>
@@ -215,7 +216,7 @@ export default function DesignsPage() {
             <i className="fas fa-spinner fa-pulse text-3xl text-gray-400"></i>
           </div>
         ) : filteredDesigns.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 border border-dashed border-gray-200 rounded-2xl bg-white">
+          <div className="text-center py-20 text-gray-400 border border-dashed border-gray-200 rounded-2xl bg-white shadow-sm">
             <i className="fas fa-paint-brush text-4xl mb-3 text-gray-300"></i>
             <p className="text-lg font-medium text-gray-500">
               {search ? 'No designs match your search.' : 'No designs yet. Create one to use in your campaigns.'}
@@ -245,7 +246,7 @@ export default function DesignsPage() {
 
       {/* Full‑screen editor overlay */}
       {showEditor && (
-        <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-gradient-to-br from-white to-gray-50 overflow-y-auto">
           <DesignEditor
             onClose={() => {
               setShowEditor(false);

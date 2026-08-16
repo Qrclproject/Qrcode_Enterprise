@@ -8,10 +8,10 @@ export const launchCampaign = (campaignId) => {
   console.log('📤 Sending POST /campaigns/launch with body:', { campaignId });
   return api.post('/campaigns/launch', { campaignId });
 };
-export const sendManualMessage = (campaignId, phone, variables) =>
-  api.post(`/campaigns/${campaignId}/send-manual`, { phone, variables });
+
 export const resetRecipientCheckIn = (campaignId, recipientId) =>
   api.post(`/campaigns/${campaignId}/recipients/${recipientId}/reset-checkin`);
+
 // Get paginated campaign history (used by Sent History page)
 export const getCampaignHistory = (params) =>
   api.get('/campaigns/history', { params });
@@ -53,3 +53,17 @@ export const deleteCampaign = (id) =>
 // Delete ALL campaigns for the current user (clears history)
 export const deleteAllCampaigns = () =>
   api.delete('/campaigns');
+export const getAddRecipientsProgress = (campaignId) =>
+  api.get(`/campaigns/${campaignId}/add-recipients-progress`);
+// ✅ NEW: Add recipients to an existing campaign
+// options: { generateQr?: boolean, sendNow?: boolean }
+export const addRecipientsToCampaign = (campaignId, recipients, options = {}) =>
+  api.post(`/campaigns/${campaignId}/recipients`, {
+    recipients,
+    generateQr: options.generateQr || false,
+    sendNow: options.sendNow || false,
+  });
+
+// Send manual WhatsApp message to a specific number
+export const sendManualMessage = (campaignId, phone, variables = {}) =>
+  api.post(`/campaigns/${campaignId}/send-manual`, { phone, variables });

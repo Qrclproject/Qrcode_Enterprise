@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
-import Modal from '../common/Modal';   // ✅ correct path
-import Button from '../common/Button'; // ✅ correct path
+import Modal from '../common/Modal';
+import Button from '../common/Button';
 
 // ─── Breadcrumb mapping ──────────────────────────────────────────
 const breadcrumbMap = {
@@ -62,19 +62,19 @@ export default function Header({ onToggleMobileMenu }) {
   // ─── Status styling ──────────────────────────────────────────
   const statusConfig = {
     healthy: {
-      bg: 'bg-emerald-100',
+      bg: 'bg-gradient-to-r from-emerald-50 to-emerald-100',
       text: 'text-emerald-700',
       dot: 'bg-emerald-500',
       label: 'API Healthy',
     },
     unhealthy: {
-      bg: 'bg-red-100',
+      bg: 'bg-gradient-to-r from-red-50 to-red-100',
       text: 'text-red-700',
       dot: 'bg-red-500',
       label: 'API Error',
     },
     loading: {
-      bg: 'bg-gray-100',
+      bg: 'bg-gradient-to-r from-gray-50 to-gray-100',
       text: 'text-gray-500',
       dot: 'bg-gray-400 animate-pulse',
       label: 'Checking...',
@@ -84,35 +84,35 @@ export default function Header({ onToggleMobileMenu }) {
 
   return (
     <>
-      <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-5 shrink-0">
+      <header className="h-14 bg-white/90 backdrop-blur-md border-b border-gray-200/80 flex items-center justify-between px-5 shrink-0 shadow-sm sticky top-0 z-20">
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleMobileMenu}
-            className="lg:hidden text-gray-500 hover:text-gray-800 focus:outline-none"
+            className="lg:hidden text-gray-500 hover:text-gray-800 focus:outline-none transition-colors"
             aria-label="Toggle sidebar"
           >
             <i className="fas fa-bars text-lg"></i>
           </button>
           <div className="text-xs text-gray-400 font-medium">
-            {parent} / <span className="text-gray-700">{current}</span>
+            {parent} / <span className="text-gray-700 font-semibold">{current}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-3 text-xs text-gray-500">
           {/* ─── Dynamic health badge ─────────────────────────────── */}
           <span
-            className={`${status.bg} ${status.text} px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 transition-colors duration-300`}
+            className={`${status.bg} ${status.text} px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 transition-colors duration-300 shadow-sm`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`}></span>
             {status.label}
           </span>
 
-          <i className="fas fa-bell text-gray-400 cursor-pointer hover:text-gray-600"></i>
+          <i className="fas fa-bell text-gray-400 cursor-pointer hover:text-gray-600 transition-colors"></i>
           <div className="flex items-center gap-2 ml-2">
             <span className="text-gray-700 font-medium">{user?.name || 'User'}</span>
             <button
               onClick={openLogoutModal}
-              className="text-gray-400 hover:text-red-500 transition"
+              className="text-gray-400 hover:text-red-500 transition-colors"
               title="Logout"
               disabled={isLoggingOut}
             >

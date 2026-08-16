@@ -36,18 +36,18 @@ export default function Sidebar({ onCloseMobile }) {
     : menuItems.filter(item => permissions.includes(item.permission));
 
   const linkClass = ({ isActive }) =>
-    `flex items-center ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'} py-2.5 text-sm font-medium rounded-lg transition ${
+    `flex items-center ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'} py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
       isActive 
-        ? 'bg-orange-50 text-orange-600 border border-orange-600 shadow-sm' 
-        : 'text-gray-500 hover:bg-gray-50'
+        ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white border border-orange-500 shadow-md shadow-orange-200' 
+        : 'text-gray-600 hover:bg-orange-50 hover:text-orange-700'
     }`;
 
   return (
     <aside
-      className={`${collapsed ? 'w-20' : 'w-60'} h-full bg-white border-r border-gray-200 flex flex-col z-20 shadow-sm transition-all duration-300`}
+      className={`${collapsed ? 'w-20' : 'w-60'} h-full bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 flex flex-col z-20 shadow-md transition-all duration-300`}
     >
       {/* ─── Brand + Collapse Toggle ─────────────────────────── */}
-      <div className={`h-16 flex items-center border-b border-gray-200 bg-white ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
+      <div className={`h-16 flex items-center border-b border-gray-200 bg-white/80 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
         {!collapsed && (
           <img 
             src="/logo.png" 
@@ -99,7 +99,7 @@ export default function Sidebar({ onCloseMobile }) {
 
       {/* API status */}
       <div className="p-2 border-t border-gray-100">
-        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2'} text-xs text-gray-500 bg-gray-50 rounded-lg p-2.5`}>
+        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2'} text-xs text-gray-500 bg-gradient-to-r from-gray-50 to-white rounded-lg p-2.5 border border-gray-100`}>
           <span className="w-2 h-2 rounded-full bg-green-500 pulse-dot"></span>
           {!collapsed && (
             <span>API Connected • {user?.role === 'admin' ? 'Admin' : 'Agent'}</span>

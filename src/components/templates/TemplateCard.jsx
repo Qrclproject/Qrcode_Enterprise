@@ -11,14 +11,14 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
   }[template.buttonType] || null;
 
   return (
-    <div className="relative bg-white rounded-xl border border-gray-200 p-4 template-card flex flex-col">
+    <div className="relative bg-white rounded-xl border border-gray-200 p-4 template-card flex flex-col shadow-sm hover:shadow-md">
       {onSelect && (
         <div className="absolute top-2 left-2 z-10">
           <input
             type="checkbox"
             checked={selected || false}
             onChange={(e) => onSelect(templateId, e.target.checked)}
-            className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500 cursor-pointer"
+            className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500 cursor-pointer accent-orange-500"
           />
         </div>
       )}
@@ -31,7 +31,7 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
           {/* ─── Edit Variants (pencil) ──────────────────────────── */}
           <button
             onClick={() => onEdit(templateId)}
-            className="text-gray-400 hover:text-blue-600 p-1"
+            className="text-gray-400 hover:text-orange-600 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200"
             title="Edit Variants"
           >
             <i className="fas fa-edit"></i>
@@ -40,16 +40,16 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
           {onEditProperties && (
             <button
               onClick={() => onEditProperties(template)}
-              className="text-gray-400 hover:text-gray-700 p-1"
+              className="text-gray-400 hover:text-orange-600 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200"
               title="Edit Template Properties"
             >
               <i className="fas fa-cog"></i>
             </button>
           )}
-          <button onClick={() => onClone(templateId)} className="text-gray-400 hover:text-green-600 p-1" title="Clone">
+          <button onClick={() => onClone(templateId)} className="text-gray-400 hover:text-green-600 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200" title="Clone">
             <i className="fas fa-clone"></i>
           </button>
-          <button onClick={() => onDelete(templateId)} className="text-gray-400 hover:text-red-500 p-1" title="Delete">
+          <button onClick={() => onDelete(templateId)} className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200" title="Delete">
             <i className="fas fa-trash-alt"></i>
           </button>
         </div>
@@ -63,7 +63,7 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
       )}
 
       {buttonLabel && (
-        <span className="inline-block mt-1 text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+        <span className="inline-block mt-1 text-[10px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
           {buttonLabel}
         </span>
       )}
@@ -73,7 +73,7 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
           <span
             key={v.label}
             className={`text-[9px] px-1.5 py-0.5 rounded-full border ${
-              v.active ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-gray-50 text-gray-400 border-gray-200 line-through'
+              v.active ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-gray-50 text-gray-400 border-gray-200 line-through'
             }`}
           >
             {v.label}

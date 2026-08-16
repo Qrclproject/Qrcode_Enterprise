@@ -21,6 +21,7 @@ import {
 import { getTemplates } from '../services/templateService';
 import { getDesigns } from '../services/designService';
 import { normalizePhone } from '../utils/formatters';
+
 // ─── Static fallback templates (unchanged) ─────────────────────
 const staticFallback = [
   {
@@ -138,7 +139,7 @@ function QrConfigFields({ columns, mapping, setMapping, qrDataFields, textOverla
           newPlaceholders[key] = e.target.value;
           setMapping({ ...mapping, placeholders: newPlaceholders });
         }}
-        className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5"
+        className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
       >
         <option value="">-- Select Column --</option>
         {columns.map(col => <option key={col} value={col}>[{col}]</option>)}
@@ -230,13 +231,13 @@ export default function CampaignBuilderPage() {
   const isQrProcessing = qrGenStatus === 'processing';
   const isUploadingHeader = uploadingHeader;
   const panelDisabled = !isDataUploaded || !isTemplateSelected;
- const canLaunch =
-  isDataUploaded &&
-  isTemplateSelected &&
-  !isQrProcessing &&
-  !isUploadingHeader &&
-  !isRunning &&
-  (includeHeaderImage && generateQr ? !!designId : true);
+  const canLaunch =
+    isDataUploaded &&
+    isTemplateSelected &&
+    !isQrProcessing &&
+    !isUploadingHeader &&
+    !isRunning &&
+    (includeHeaderImage && generateQr ? !!designId : true);
 
   // ─── Fetch templates from backend (runs only once on mount) ──
   useEffect(() => {
@@ -292,7 +293,7 @@ export default function CampaignBuilderPage() {
         showToast('warning', 'Using offline templates', 'Could not fetch templates from server.');
       }
     })();
-  }, [showToast]);   // ✅ removed `template` from dependencies
+  }, [showToast]);
 
   // ─── Fetch designs on mount ──────────────────────────────────
   useEffect(() => {
@@ -422,7 +423,6 @@ export default function CampaignBuilderPage() {
   // ─── Upload header image handler (now updates backend if campaign exists) ──
   const handleHeaderImageUpload = async (file) => {
     if (!file) {
-      // Removing image
       setHeaderImageUrl('');
       setIncludeHeaderImage(false);
       if (campaignId) {
@@ -489,14 +489,14 @@ export default function CampaignBuilderPage() {
     }
 
     try {
-const recipients = data.map(row => {
-  const rec = {};
-  Object.entries(row).forEach(([key, value]) => {
-    rec[key] = value === null || value === undefined ? '' : String(value);
-  });
-  rec.phone = normalizePhone(row[mappingObj.phone] || '');
-  return rec;
-});
+      const recipients = data.map(row => {
+        const rec = {};
+        Object.entries(row).forEach(([key, value]) => {
+          rec[key] = value === null || value === undefined ? '' : String(value);
+        });
+        rec.phone = normalizePhone(row[mappingObj.phone] || '');
+        return rec;
+      });
       const campaignData = {
         name: name || 'Campaign ' + new Date().toLocaleDateString(),
         templateKey: template,
@@ -606,8 +606,8 @@ const recipients = data.map(row => {
 
     window.history.replaceState({}, document.title);
 
- setPendingData(data);
-setPendingMapping(restoreState?.mapping || computeMapping(Object.keys(data[0] || {})));
+    setPendingData(data);
+    setPendingMapping(restoreState?.mapping || computeMapping(Object.keys(data[0] || {})));
 
   }, [location.state?.spreadsheetData, location.state?.restoreState]);
 
@@ -729,75 +729,75 @@ setPendingMapping(restoreState?.mapping || computeMapping(Object.keys(data[0] ||
     setCampaignName('');
   };
 
-const handleLaunch = async () => {
-  if (!parsedData || total === 0) {
-    showToast('error', 'No data', 'Please upload an Excel/CSV file first.');
-    return;
-  }
-
-  let cid = campaignId;
-
-  // If campaign doesn't exist yet, create it now
-  if (!cid) {
-    if (!campaignName.trim()) {
-      // Ask for campaign name (or use default)
-      const name = prompt('Enter campaign name:', 'Campaign ' + new Date().toLocaleString());
-      if (!name) return;
-      setCampaignName(name);
-    }
-    setIsRunning(true);
-    setProgress(5);
-    setStatus('Creating campaign...');
-    try {
-      const created = await createCampaign({
-        name: campaignName || 'Campaign ' + new Date().toLocaleString(),
-        templateKey: template,
-        templateId: template,
-        recipients: parsedData.map(row => ({ ...row, phone: row[mapping.phone] || '' })),
-        batchSize: Number(batchSize),
-        waitValue: Number(waitValue),
-        waitUnit,
-        activeVariants: activeVariants[template] || [0],
-        variants: (templateDefs[template]?.variants || []).map(v => v.label),
-        mapping: {
-          phone: String(mapping.phone),
-          qr: String(mapping.qr),
-          ...mapping.placeholders,
-        },
-        headerImageUrl: includeHeaderImage ? (headerImageUrl || undefined) : undefined,
-        designId: includeHeaderImage && generateQr ? (designId || undefined) : undefined,
-        includeHeaderImage,
-      });
-      cid = created.data?._id || created.data?.id;
-      setCampaignId(cid);
-      setCampaignName(campaignName);
-      showToast('success', 'Campaign created', 'Now launching...');
-    } catch (err) {
-      setIsRunning(false);
-      showToast('error', 'Creation failed', err.message);
+  const handleLaunch = async () => {
+    if (!parsedData || total === 0) {
+      showToast('error', 'No data', 'Please upload an Excel/CSV file first.');
       return;
     }
-  }
 
-  // Launch the campaign
-  try {
-    setIsRunning(true);
-    setProgress(10);
-    setStatus('Launching campaign...');
-    console.log('📡 Calling launchCampaign with campaignId:', cid);
-    const result = await launchCampaign(cid);
-    console.log('✅ Launch response:', result);
-    setIsRunning(false);
-    setProgress(100);
-    const delivered = result.data?.delivered ?? 0;
-    const failed = result.data?.failed ?? 0;
-    showToast('success', 'Campaign Launched', `Sent: ${delivered} | Failed: ${failed}`);
-  } catch (error) {
-    console.error('❌ Launch failed:', error);
-    setIsRunning(false);
-    showToast('error', 'Launch Failed', error.response?.data?.message || error.message);
-  }
-};
+    let cid = campaignId;
+
+    // If campaign doesn't exist yet, create it now
+    if (!cid) {
+      if (!campaignName.trim()) {
+        const name = prompt('Enter campaign name:', 'Campaign ' + new Date().toLocaleString());
+        if (!name) return;
+        setCampaignName(name);
+      }
+      setIsRunning(true);
+      setProgress(5);
+      setStatus('Creating campaign...');
+      try {
+        const created = await createCampaign({
+          name: campaignName || 'Campaign ' + new Date().toLocaleString(),
+          templateKey: template,
+          templateId: template,
+          recipients: parsedData.map(row => ({ ...row, phone: row[mapping.phone] || '' })),
+          batchSize: Number(batchSize),
+          waitValue: Number(waitValue),
+          waitUnit,
+          activeVariants: activeVariants[template] || [0],
+          variants: (templateDefs[template]?.variants || []).map(v => v.label),
+          mapping: {
+            phone: String(mapping.phone),
+            qr: String(mapping.qr),
+            ...mapping.placeholders,
+          },
+          headerImageUrl: includeHeaderImage ? (headerImageUrl || undefined) : undefined,
+          designId: includeHeaderImage && generateQr ? (designId || undefined) : undefined,
+          includeHeaderImage,
+        });
+        cid = created.data?._id || created.data?.id;
+        setCampaignId(cid);
+        setCampaignName(campaignName);
+        showToast('success', 'Campaign created', 'Now launching...');
+      } catch (err) {
+        setIsRunning(false);
+        showToast('error', 'Creation failed', err.message);
+        return;
+      }
+    }
+
+    // Launch the campaign
+    try {
+      setIsRunning(true);
+      setProgress(10);
+      setStatus('Launching campaign...');
+      console.log('📡 Calling launchCampaign with campaignId:', cid);
+      const result = await launchCampaign(cid);
+      console.log('✅ Launch response:', result);
+      setIsRunning(false);
+      setProgress(100);
+      const delivered = result.data?.delivered ?? 0;
+      const failed = result.data?.failed ?? 0;
+      showToast('success', 'Campaign Launched', `Sent: ${delivered} | Failed: ${failed}`);
+    } catch (error) {
+      console.error('❌ Launch failed:', error);
+      setIsRunning(false);
+      showToast('error', 'Launch Failed', error.response?.data?.message || error.message);
+    }
+  };
+
   const handleTestSend = (phone) => {
     if (!phone) {
       showToast('warning', 'Missing Number', 'Please enter a phone number.');
@@ -903,7 +903,7 @@ const handleLaunch = async () => {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-5 pb-20">
+    <div className="flex-1 overflow-y-auto p-4 md:p-5 pb-20 bg-gradient-to-br from-gray-50 to-orange-50/30">
       
       <div className="mb-5 flex justify-between items-end">
         <div>
@@ -923,19 +923,19 @@ const handleLaunch = async () => {
                     restoreState: buildRestoreState(),
                   }
                 })}
-                className="text-xs text-blue-600 hover:underline bg-transparent border-none cursor-pointer"
+                className="text-xs text-blue-600 hover:underline bg-transparent border-none cursor-pointer hover:text-blue-800 transition-colors"
               >
                 <i className="fas fa-edit mr-1"></i> Edit Data
               </button>
               <button
                 onClick={handleReset}
-                className="text-xs text-red-600 hover:underline bg-transparent border-none cursor-pointer"
+                className="text-xs text-red-600 hover:underline bg-transparent border-none cursor-pointer hover:text-red-800 transition-colors"
               >
                 <i className="fas fa-trash-alt mr-1"></i> Remove Sheet
               </button>
             </>
           )}
-          <div className="text-xs bg-orange-50 text-orange-600 px-3 py-1.5 rounded-full font-bold border border-orange-100">
+          <div className="text-xs bg-gradient-to-r from-orange-50 to-orange-100 text-orange-700 px-3 py-1.5 rounded-full font-bold border border-orange-200 shadow-sm">
             {total} recipients
           </div>
         </div>
@@ -959,7 +959,7 @@ const handleLaunch = async () => {
 
       {/* QR generation progress banners */}
       {qrGenStatus === 'processing' && (
-        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-3">
+        <div className="mb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 flex items-center gap-3 shadow-sm">
           <i className="fas fa-qrcode text-blue-500 text-lg animate-pulse"></i>
           <div className="flex-1">
             <div className="flex justify-between text-xs font-medium text-blue-700 mb-1">
@@ -968,7 +968,7 @@ const handleLaunch = async () => {
             </div>
             <div className="w-full bg-blue-200 rounded-full h-2">
               <div
-                className="h-2 bg-blue-500 rounded-full transition-all duration-300"
+                className="h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300"
                 style={{ width: `${(qrGenProgress / (qrGenTotal || 1)) * 100}%` }}
               ></div>
             </div>
@@ -976,12 +976,12 @@ const handleLaunch = async () => {
         </div>
       )}
       {qrGenStatus === 'completed' && (
-        <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-green-700 text-xs font-medium">
+        <div className="mb-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-green-700 text-xs font-medium shadow-sm">
           <i className="fas fa-check-circle"></i> All QR codes generated and hosted.
         </div>
       )}
       {qrGenStatus === 'failed' && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-700 text-xs font-medium">
+        <div className="mb-4 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-700 text-xs font-medium shadow-sm">
           <i className="fas fa-exclamation-circle"></i> QR generation failed. Please try again.
         </div>
       )}
@@ -998,8 +998,8 @@ const handleLaunch = async () => {
       >
         <div className="flex flex-col h-full space-y-4 pt-1">
           {designs.length === 0 ? (
-            <div className="text-center py-8 px-4 border border-dashed border-gray-200 rounded-xl bg-gray-50/50 flex flex-col items-center justify-center">
-              <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 mb-3">
+            <div className="text-center py-8 px-4 border border-dashed border-gray-200 rounded-xl bg-gradient-to-b from-gray-50 to-white flex flex-col items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-100 to-orange-50 flex items-center justify-center text-orange-500 mb-3 shadow-sm">
                 <i className="fas fa-paint-brush text-sm"></i>
               </div>
               <p className="text-sm font-semibold text-gray-700">No designs found</p>
@@ -1008,7 +1008,7 @@ const handleLaunch = async () => {
               </p>
               <button
                 onClick={() => { navigate('/designs'); setShowDesignModal(false); }}
-                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-xs font-semibold shadow-md shadow-orange-200 transition-all"
               >
                 Create a New Design
               </button>
@@ -1093,7 +1093,7 @@ const handleLaunch = async () => {
             value={campaignName}
             onChange={(e) => setCampaignName(e.target.value)}
             placeholder="e.g., Summer Gala 2026, Tech Conference Check-In"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 outline-none transition-shadow"
             autoFocus
             onKeyDown={(e) => { if (e.key === 'Enter') handleNameSubmit(); }}
           />

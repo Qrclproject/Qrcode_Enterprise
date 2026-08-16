@@ -23,12 +23,6 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
     });
   };
 
-  const buttonTypeLabel = {
-    none: 'None',
-    phone_number: '📞 Call Phone Number',
-    url: '🔗 Visit URL',
-  };
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={initialData ? 'Edit Template' : 'Create Template'} size="max-w-lg">
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -38,7 +32,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
+            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
             required
             placeholder="e.g., Invitation Message"
           />
@@ -49,7 +43,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
             type="text"
             value={whatsappTemplateName}
             onChange={(e) => setWhatsappTemplateName(e.target.value)}
-            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
+            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
             required
             placeholder="Exact name from Meta Business Suite"
           />
@@ -63,7 +57,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
+            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow bg-white"
           >
             <option value="delivery">🎫 Delivery</option>
             <option value="reminder">⏰ Reminder</option>
@@ -78,7 +72,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
             type="checkbox"
             checked={showQR}
             onChange={(e) => setShowQR(e.target.checked)}
-            className="rounded"
+            className="rounded accent-orange-500 w-4 h-4"
           />
           <span className="text-xs text-gray-600">Include QR Code Header</span>
         </div>
@@ -95,7 +89,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
                 setButtonValue('');
               }
             }}
-            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
+            className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow bg-white"
           >
             <option value="none">None</option>
             <option value="phone_number">📞 Call Phone Number</option>
@@ -110,7 +104,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
                   type="text"
                   value={buttonText}
                   onChange={(e) => setButtonText(e.target.value)}
-                  className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
+                  className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
                   placeholder={buttonType === 'phone_number' ? 'Call Now' : 'Learn More'}
                   required={buttonType !== 'none'}
                   maxLength={40}
@@ -124,7 +118,7 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
                   type={buttonType === 'phone_number' ? 'tel' : 'url'}
                   value={buttonValue}
                   onChange={(e) => setButtonValue(e.target.value)}
-                  className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
+                  className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
                   placeholder={buttonType === 'phone_number' ? '+2348012345678' : 'https://example.com'}
                   required={buttonType !== 'none'}
                 />
@@ -134,10 +128,17 @@ export default function TemplateForm({ isOpen, onClose, onSave, initialData }) {
         </div>
 
         <div className="flex justify-end gap-2 pt-3 border-t">
-          <button type="button" onClick={onClose} className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50 transition-colors"
+          >
             Cancel
           </button>
-          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-blue-700">
+          <button 
+            type="submit" 
+            className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:from-orange-600 hover:to-orange-700 shadow-md shadow-orange-200 transition-all"
+          >
             Save
           </button>
         </div>

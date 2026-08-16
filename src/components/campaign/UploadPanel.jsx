@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
 import { useToast } from '../layout/Toast';
-import { convertScientificNotation, normalizePhone } from '../../utils/formatters';
+import { normalizePhone } from '../../utils/formatters';
 
-export default function UploadPanel({ onReset }) {
+export default function UploadPanel({ onReset, onFileParsed }) {
   const navigate = useNavigate();
   const showToast = useToast();
 
@@ -39,10 +39,14 @@ export default function UploadPanel({ onReset }) {
           return newRow;
         });
 
-        // Navigate to spreadsheet editor with parsed and cleaned data
-        navigate('/spreadsheet-editor', {
-          state: { parsedData: formattedData, fileName: file.name },
-        });
+        // If custom callback provided, use it; otherwise navigate to spreadsheet editor
+        if (onFileParsed) {
+          onFileParsed(formattedData);
+        } else {
+          navigate('/spreadsheet-editor', {
+            state: { parsedData: formattedData, fileName: file.name },
+          });
+        }
       } catch (err) {
         showToast('error', 'Parse Error', 'Could not parse file. Ensure it has headers and data rows.');
       }
@@ -51,7 +55,7 @@ export default function UploadPanel({ onReset }) {
       showToast('error', 'File Error', 'Could not read file. Please try again.');
     };
     reader.readAsArrayBuffer(file);
-  }, [navigate, showToast]);
+  }, [navigate, showToast, onFileParsed]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (acceptedFiles) => {
@@ -71,8 +75,10 @@ export default function UploadPanel({ onReset }) {
       </div>
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition bg-gray-50/50 flex-1 flex flex-col items-center justify-center min-h-[160px] ${
-          isDragActive ? 'border-blue-400 bg-blue-50' : 'border-blue-200 hover:border-blue-400 hover:bg-blue-50/50'
+        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[160px] ${
+          isDragActive
+            ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md'
+            : 'border-blue-200 bg-gradient-to-br from-gray-50 to-white hover:border-blue-400 hover:from-blue-50/50 hover:to-indigo-50/50 shadow-sm'
         }`}
       >
         <input {...getInputProps()} />

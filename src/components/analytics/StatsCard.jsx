@@ -1,15 +1,15 @@
 export default function StatsCard({ icon, color, label, value, subtitle }) {
   const colorMap = {
-    blue: 'bg-blue-100 text-blue-600',
-    emerald: 'bg-emerald-100 text-emerald-600',
-    red: 'bg-red-100 text-red-600',
-    amber: 'bg-amber-100 text-amber-600',
+    blue: 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200',
+    emerald: 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-emerald-200',
+    red: 'bg-gradient-to-br from-red-500 to-red-600 text-white shadow-red-200',
+    amber: 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-amber-200',
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${colorMap[color] || 'bg-gray-100 text-gray-600'}`}>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md ${colorMap[color] || 'bg-gradient-to-br from-gray-500 to-gray-600 text-white shadow-gray-200'}`}>
           <i className={`fas fa-${icon}`}></i>
         </div>
         <div>

@@ -8,8 +8,8 @@ export default function VariantEditor({
   onSave,
   onCancel,
   templateId,
-  templateName,           // 👈 new prop
-  whatsappTemplateName,   // 👈 new prop
+  templateName,
+  whatsappTemplateName,
   showToast,
 }) {
   const [variants, setVariants] = useState(initialVariants || []);
@@ -83,12 +83,12 @@ export default function VariantEditor({
       </div>
 
       {/* Placeholder guidelines */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-xs text-orange-700 shadow-sm">
         <p className="font-semibold">📌 Placeholder guidelines</p>
-        <ul className="list-disc list-inside mt-1 space-y-0.5 text-blue-600">
+        <ul className="list-disc list-inside mt-1 space-y-0.5 text-orange-600">
           <li>
-            Use <code className="bg-blue-100 px-1 rounded">{'{{1}}'}</code>,{' '}
-            <code className="bg-blue-100 px-1 rounded">{'{{2}}'}</code>, … for dynamic content.
+            Use <code className="bg-orange-100 px-1 rounded">{'{{1}}'}</code>,{' '}
+            <code className="bg-orange-100 px-1 rounded">{'{{2}}'}</code>, … for dynamic content.
           </li>
           <li>The number of placeholders must match your Meta WhatsApp template.</li>
           <li>In the Campaign Builder, you will map columns to these numbers.</li>
@@ -100,7 +100,7 @@ export default function VariantEditor({
         <button
           onClick={addVariant}
           disabled={variants.length >= 5}
-          className="text-blue-600 text-xs font-medium hover:underline disabled:opacity-40"
+          className="text-orange-600 text-xs font-medium hover:underline disabled:opacity-40"
         >
           + Add Variant
         </button>
@@ -110,15 +110,15 @@ export default function VariantEditor({
       </p>
 
       {variants.map((v, idx) => (
-        <div key={idx} className="bg-white rounded-lg border p-3 space-y-3">
+        <div key={idx} className="bg-white rounded-lg border p-3 space-y-3 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => toggleActive(idx)}
-                className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium border ${
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
                   v.active
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-gray-100 text-gray-400 border-gray-200'
+                    ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white border-orange-500 shadow-sm'
+                    : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
                 }`}
               >
                 {v.active ? '●' : '○'} {v.label || `Variant ${idx + 1}`}
@@ -128,14 +128,14 @@ export default function VariantEditor({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => navigate(`/templates/${templateId}/variants/${idx}`)}
-                className="text-gray-400 hover:text-blue-600 p-1"
+                className="text-gray-400 hover:text-orange-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
                 title="Edit in full editor"
               >
                 <i className="fas fa-pencil-alt text-xs"></i>
               </button>
               <button
                 onClick={() => removeVariant(idx)}
-                className="text-gray-400 hover:text-red-500 p-1"
+                className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-gray-100 transition-colors"
                 title="Delete this variant"
               >
                 <i className="fas fa-times text-xs"></i>
@@ -151,7 +151,7 @@ export default function VariantEditor({
               value={v.label}
               onChange={(e) => handleLabelChange(idx, e.target.value)}
               placeholder="Label"
-              className="w-full border border-gray-200 rounded px-3 py-1.5 text-xs"
+              className="w-full border border-gray-200 rounded px-3 py-1.5 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
             />
           </div>
 
@@ -173,13 +173,13 @@ export default function VariantEditor({
       <div className="flex justify-end gap-2 pt-2">
         <button 
           onClick={onCancel} 
-          className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50"
+          className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50 transition-colors"
         >
           Cancel
         </button>
         <button 
           onClick={handleSave} 
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-blue-700"
+          className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:from-orange-600 hover:to-orange-700 shadow-md shadow-orange-200 transition-all"
         >
           Save Changes
         </button>

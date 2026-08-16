@@ -257,7 +257,14 @@ export default function CampaignDetailPage() {
               {total} recipients · Created {new Date(campaign.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              icon="user-plus"
+              onClick={() => navigate(`/campaigns/${campaignId}/add-recipients`)}
+            >
+              Add Recipients
+            </Button>
             <Button variant="outline" onClick={exportCSV} icon="download">
               Export CSV
             </Button>

@@ -912,7 +912,7 @@ export default function DesignEditor({ onClose, onDesignCreated, initialDesign }
   ];
 
   return (
-    <div className={`bg-white rounded-2xl p-6 max-w-7xl mx-auto h-screen flex flex-col ${isEditorFullscreen ? 'max-w-full p-2' : ''}`}>
+    <div className={`bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 max-w-7xl mx-auto h-screen flex flex-col shadow-xl ${isEditorFullscreen ? 'max-w-full p-2' : ''}`}>
       {/* Header with fullscreen toggle and controls button */}
       <div className="flex items-center gap-2 mb-4 shrink-0">
         <h3 className="text-lg font-bold text-gray-800">
@@ -920,7 +920,7 @@ export default function DesignEditor({ onClose, onDesignCreated, initialDesign }
         </h3>
         <button
           onClick={() => setIsEditorFullscreen(!isEditorFullscreen)}
-          className="ml-auto text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
+          className="ml-auto text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
         >
           <i className={`fas ${isEditorFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
           {isEditorFullscreen ? 'Exit Fullscreen' : 'Fullscreen Editor'}
@@ -928,7 +928,7 @@ export default function DesignEditor({ onClose, onDesignCreated, initialDesign }
         {isEditorFullscreen && (
           <button
             onClick={() => setShowControlsOverlay(!showControlsOverlay)}
-            className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
+            className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
           >
             <i className="fas fa-sliders-h"></i>
             {showControlsOverlay ? 'Hide Controls' : 'Show Controls'}
@@ -939,7 +939,7 @@ export default function DesignEditor({ onClose, onDesignCreated, initialDesign }
       <div className="flex flex-1 gap-6 min-h-0 relative">
         {/* Controls overlay in fullscreen mode */}
         {isEditorFullscreen && showControlsOverlay && (
-          <div className="absolute top-0 left-0 z-30 w-80 h-full overflow-y-auto bg-white border-r border-gray-200 shadow-lg p-4">
+          <div className="absolute top-0 left-0 z-30 w-80 h-full overflow-y-auto bg-white border-r border-gray-200 shadow-lg p-4 bg-gradient-to-b from-white to-gray-50">
             <ControlsPanel
               designName={designName}
               setDesignName={setDesignName}
@@ -1007,7 +1007,7 @@ export default function DesignEditor({ onClose, onDesignCreated, initialDesign }
       <div className="flex-1 flex flex-col gap-4 min-h-0">
   <div
     ref={designAreaRef}
-className="flex-1 border rounded-lg overflow-auto flex items-start justify-center bg-gray-50 relative min-h-0"
+    className="flex-1 border rounded-lg overflow-auto flex items-start justify-center bg-gradient-to-br from-gray-50 to-gray-100 relative min-h-0 shadow-inner"
   >
     {imagePreview ? (
     <div className="relative inline-block">
@@ -1054,7 +1054,7 @@ className="flex-1 border rounded-lg overflow-auto flex items-start justify-cente
           bounds="parent"
           style={{ zIndex: 10 }}
         >
-          <div className="w-full h-full border-2 border-dashed border-orange-500 bg-white/50 flex items-center justify-center text-xs font-bold text-orange-600 select-none">
+          <div className="w-full h-full border-2 border-dashed border-orange-500 bg-orange-50/80 flex items-center justify-center text-xs font-bold text-orange-600 select-none rounded-lg shadow-md">
             QR
           </div>
         </Rnd>
@@ -1079,14 +1079,14 @@ className="flex-1 border rounded-lg overflow-auto flex items-start justify-cente
             bounds="parent"
             style={{ zIndex: 5 }}
           >
-            <div className="w-full h-full border-2 border-dashed border-green-500 bg-white/30 flex items-center justify-center text-[8px] text-green-600 select-none">
+            <div className="w-full h-full border-2 border-dashed border-green-500 bg-green-50/30 flex items-center justify-center text-[8px] text-green-600 select-none rounded-lg">
               T{idx+1}
             </div>
           </Rnd>
         ))}
       </div>
     ) : (
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400">
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400 bg-white/50">
         Upload an image to start designing
       </div>
     )}
@@ -1094,15 +1094,15 @@ className="flex-1 border rounded-lg overflow-auto flex items-start justify-cente
     {/* ─── Floating Live Preview (bottom‑right inside design area) ─── */}
     {showPreview && !isEditorFullscreen && (
       <div
-        className="absolute bottom-2 right-2 w-44 md:w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-40 cursor-zoom-in overflow-hidden"
+        className="absolute bottom-2 right-2 w-44 md:w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-40 cursor-zoom-in overflow-hidden bg-gradient-to-b from-white to-gray-50"
         onClick={openFullscreenPreview}
       >
         <div className="p-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-semibold text-gray-500">Live Preview</span>
-            <i className="fas fa-expand text-xs text-gray-400 hover:text-gray-600"></i>
+            <i className="fas fa-expand text-xs text-gray-400 hover:text-gray-600 transition-colors"></i>
           </div>
-          <div className="flex justify-center items-center bg-gray-50 rounded-md">
+          <div className="flex justify-center items-center bg-gray-50 rounded-md p-1">
             <canvas
               ref={previewCanvasRef}
               style={{
@@ -1126,14 +1126,14 @@ className="flex-1 border rounded-lg overflow-auto flex items-start justify-cente
       <div className="flex justify-end gap-2 pt-3 border-t mt-4 shrink-0">
         <button
           onClick={onClose}
-          className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50"
+          className="text-gray-600 border border-gray-200 px-4 py-2 rounded-lg text-xs hover:bg-gray-50 transition-colors"
         >
           Cancel
         </button>
         <button
           onClick={handleSave}
           disabled={!imagePreview || saving}
-          className="bg-orange-500 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-orange-600 disabled:opacity-50"
+          className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-2 rounded-lg text-xs font-semibold hover:from-orange-600 hover:to-orange-700 shadow-md shadow-orange-200 disabled:opacity-50 transition-all"
         >
           {saving ? 'Saving…' : 'Save Design'}
         </button>
@@ -1142,20 +1142,20 @@ className="flex-1 border rounded-lg overflow-auto flex items-start justify-cente
       {/* Fullscreen Preview Modal */}
       {fullscreenPreview && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-black/80 to-black/60 p-4 backdrop-blur-sm"
           onClick={closeFullscreenPreview}
         >
           <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={closeFullscreenPreview}
-              className="absolute top-2 right-2 text-white bg-gray-800 rounded-full w-8 h-8 flex items-center justify-center hover:bg-gray-700 z-10"
+              className="absolute top-2 right-2 text-white bg-gray-800 rounded-full w-8 h-8 flex items-center justify-center hover:bg-gray-700 z-10 transition-colors"
             >
               <i className="fas fa-times"></i>
             </button>
             <img
               src={fullscreenPreviewUrl}
               alt="Fullscreen preview"
-              className="max-w-full max-h-[90vh] object-contain"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
             />
           </div>
         </div>
@@ -1186,7 +1186,7 @@ function ControlsPanel({
           type="text"
           value={designName}
           onChange={(e) => setDesignName(e.target.value)}
-          className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm"
+          className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow bg-white"
           placeholder="e.g., Gala Dinner Pass"
         />
       </div>
@@ -1194,7 +1194,12 @@ function ControlsPanel({
         <label className="text-xs font-semibold text-gray-500">
           {initialDesign ? 'Replace Image (optional)' : 'Upload Event Pass Image'}
         </label>
-        <input type="file" accept="image/*" onChange={handleFileChange} className="w-full mt-1 text-sm" />
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="w-full mt-1 text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-colors bg-white border border-gray-200 rounded-lg p-1"
+        />
       </div>
 
       {/* QR Styling */}
@@ -1206,10 +1211,10 @@ function ControlsPanel({
             type="color"
             value={qrConfig.lightColor}
             onChange={(e) => handleQrConfigChange('lightColor', e.target.value)}
-            className="w-full h-8 p-0 border border-gray-200 rounded"
+            className="w-full h-8 p-0 border border-gray-200 rounded-lg cursor-pointer"
           />
         </div>
-        <div className="bg-gray-50 p-2 rounded border">
+        <div className="bg-gray-50 p-2 rounded-lg border border-gray-200">
           <p className="text-xs font-semibold text-gray-600 mb-1">Finder Outer Frame</p>
           <div className="flex gap-2">
             <div className="flex-1">
@@ -1218,7 +1223,7 @@ function ControlsPanel({
                 type="color"
                 value={qrConfig.finderOuterColor}
                 onChange={(e) => handleQrConfigChange('finderOuterColor', e.target.value)}
-                className="w-full h-6 p-0 border border-gray-200 rounded"
+                className="w-full h-6 p-0 border border-gray-200 rounded-lg cursor-pointer"
               />
             </div>
             <div className="flex-1">
@@ -1226,14 +1231,14 @@ function ControlsPanel({
               <select
                 value={qrConfig.finderOuterShape}
                 onChange={(e) => handleQrConfigChange('finderOuterShape', e.target.value)}
-                className="w-full border border-gray-200 rounded p-1 text-xs"
+                className="w-full border border-gray-200 rounded-lg p-1 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none bg-white"
               >
                 {shapeOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
           </div>
         </div>
-        <div className="bg-gray-50 p-2 rounded border">
+        <div className="bg-gray-50 p-2 rounded-lg border border-gray-200">
           <p className="text-xs font-semibold text-gray-600 mb-1">Finder Inner Dot</p>
           <div className="flex gap-2">
             <div className="flex-1">
@@ -1242,7 +1247,7 @@ function ControlsPanel({
                 type="color"
                 value={qrConfig.finderInnerColor}
                 onChange={(e) => handleQrConfigChange('finderInnerColor', e.target.value)}
-                className="w-full h-6 p-0 border border-gray-200 rounded"
+                className="w-full h-6 p-0 border border-gray-200 rounded-lg cursor-pointer"
               />
             </div>
             <div className="flex-1">
@@ -1250,14 +1255,14 @@ function ControlsPanel({
               <select
                 value={qrConfig.finderInnerShape}
                 onChange={(e) => handleQrConfigChange('finderInnerShape', e.target.value)}
-                className="w-full border border-gray-200 rounded p-1 text-xs"
+                className="w-full border border-gray-200 rounded-lg p-1 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none bg-white"
               >
                 {shapeOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
           </div>
         </div>
-        <div className="bg-gray-50 p-2 rounded border">
+        <div className="bg-gray-50 p-2 rounded-lg border border-gray-200">
           <p className="text-xs font-semibold text-gray-600 mb-1">Data Modules</p>
           <div className="flex gap-2">
             <div className="flex-1">
@@ -1266,7 +1271,7 @@ function ControlsPanel({
                 type="color"
                 value={qrConfig.dataColor}
                 onChange={(e) => handleQrConfigChange('dataColor', e.target.value)}
-                className="w-full h-6 p-0 border border-gray-200 rounded"
+                className="w-full h-6 p-0 border border-gray-200 rounded-lg cursor-pointer"
               />
             </div>
             <div className="flex-1">
@@ -1274,7 +1279,7 @@ function ControlsPanel({
               <select
                 value={qrConfig.dataShape}
                 onChange={(e) => handleQrConfigChange('dataShape', e.target.value)}
-                className="w-full border border-gray-200 rounded p-1 text-xs"
+                className="w-full border border-gray-200 rounded-lg p-1 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none bg-white"
               >
                 {shapeOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
@@ -1293,7 +1298,7 @@ function ControlsPanel({
           min="0" max="50"
           value={qrPadding}
           onChange={(e) => setQrPadding(Number(e.target.value))}
-          className="w-full"
+          className="w-full accent-orange-500"
         />
       </div>
 
@@ -1309,23 +1314,23 @@ function ControlsPanel({
             type="text"
             placeholder="e.g., 1"
             id="qrDataFieldInput"
-            className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs"
+            className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addQrDataField(); } }}
           />
           <button
             onClick={addQrDataField}
-            className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600"
+            className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:from-orange-600 hover:to-orange-700 shadow-sm transition-all"
           >
             Add
           </button>
         </div>
-        <div className="flex flex-wrap gap-1 mt-1">
+        <div className="flex flex-wrap gap-1 mt-2">
           {qrDataFields.map(f => (
-            <span key={f} className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs flex items-center gap-1">
+            <span key={f} className="bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full text-xs flex items-center gap-1">
               {f}
               <button
                 onClick={() => removeQrDataField(f)}
-                className="text-blue-500 hover:text-red-500"
+                className="text-orange-500 hover:text-red-500 transition-colors"
               >
                 ×
               </button>
@@ -1343,24 +1348,24 @@ function ControlsPanel({
           <h4 className="text-sm font-semibold text-gray-700">Text Overlays</h4>
           <button
             onClick={addTextOverlay}
-            className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+            className="text-xs bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:from-orange-600 hover:to-orange-700 shadow-sm transition-all"
           >
             + Add
           </button>
         </div>
         <div className="mt-2 max-h-40 overflow-y-auto space-y-2">
           {textOverlays.map((ov, idx) => (
-            <div key={idx} className="bg-gray-50 p-2 rounded border border-gray-200">
+            <div key={idx} className="bg-gray-50 p-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium">Overlay {idx+1}</span>
                 <div className="flex gap-1">
                   <button
                     onClick={() => setSelectedOverlayIndex(idx === selectedOverlayIndex ? null : idx)}
-                    className="text-xs text-blue-500"
+                    className="text-xs text-orange-600 hover:text-orange-700 transition-colors"
                   >
                     {selectedOverlayIndex === idx ? 'Hide' : 'Edit'}
                   </button>
-                  <button onClick={() => deleteOverlay(idx)} className="text-xs text-red-500">×</button>
+                  <button onClick={() => deleteOverlay(idx)} className="text-xs text-red-500 hover:text-red-700 transition-colors">×</button>
                 </div>
               </div>
               {selectedOverlayIndex === idx && (
@@ -1371,7 +1376,7 @@ function ControlsPanel({
                       type="text"
                       value={ov.placeholder}
                       onChange={(e) => updateOverlay(idx, 'placeholder', e.target.value)}
-                      className="w-full border border-gray-200 rounded px-1 py-0.5 text-xs"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
                       placeholder="e.g., 1, phone, name"
                     />
                   </div>
@@ -1381,7 +1386,7 @@ function ControlsPanel({
                       type="text"
                       value={previewTextOverrides[idx] || ''}
                       onChange={(e) => setPreviewTextOverrides(prev => ({ ...prev, [idx]: e.target.value }))}
-                      className="w-full border border-gray-200 rounded px-1 py-0.5 text-xs"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
                       placeholder="Type sample text to test wrapping"
                     />
                   </div>
@@ -1391,7 +1396,7 @@ function ControlsPanel({
                       <select
                         value={ov.style.fontFamily || 'Arial'}
                         onChange={(e) => updateOverlay(idx, 'style', { fontFamily: e.target.value })}
-                        className="w-full border border-gray-200 rounded p-1 text-xs"
+                        className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none bg-white"
                       >
                         {fontOptions.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                       </select>
@@ -1402,7 +1407,7 @@ function ControlsPanel({
                         type="number"
                         value={ov.style.fontSize}
                         onChange={(e) => updateOverlay(idx, 'style', { fontSize: Number(e.target.value) })}
-                        className="w-full border border-gray-200 rounded px-1 py-0.5 text-xs"
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
                         min="8" max="120"
                       />
                     </div>
@@ -1414,7 +1419,7 @@ function ControlsPanel({
                         type="color"
                         value={ov.style.color || '#000000'}
                         onChange={(e) => updateOverlay(idx, 'style', { color: e.target.value })}
-                        className="w-full h-6 p-0 border border-gray-200 rounded"
+                        className="w-full h-6 p-0 border border-gray-200 rounded-lg cursor-pointer"
                       />
                     </div>
                     <div>
@@ -1422,7 +1427,7 @@ function ControlsPanel({
                       <select
                         value={ov.style.alignment || 'left'}
                         onChange={(e) => updateOverlay(idx, 'style', { alignment: e.target.value })}
-                        className="w-full border border-gray-200 rounded p-1 text-xs"
+                        className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none bg-white"
                       >
                         <option value="left">Left</option>
                         <option value="center">Center</option>
@@ -1436,6 +1441,7 @@ function ControlsPanel({
                         type="checkbox"
                         checked={ov.style.bold || false}
                         onChange={(e) => updateOverlay(idx, 'style', { bold: e.target.checked })}
+                        className="accent-orange-500"
                       /> Bold
                     </label>
                     <label className="flex items-center gap-1">
@@ -1443,6 +1449,7 @@ function ControlsPanel({
                         type="checkbox"
                         checked={ov.style.italic || false}
                         onChange={(e) => updateOverlay(idx, 'style', { italic: e.target.checked })}
+                        className="accent-orange-500"
                       /> Italic
                     </label>
                     <label className="flex items-center gap-1">
@@ -1450,6 +1457,7 @@ function ControlsPanel({
                         type="checkbox"
                         checked={ov.style.underline || false}
                         onChange={(e) => updateOverlay(idx, 'style', { underline: e.target.checked })}
+                        className="accent-orange-500"
                       /> Underline
                     </label>
                   </div>
@@ -1458,7 +1466,7 @@ function ControlsPanel({
                     <select
                       value={ov.style.textTransform || 'none'}
                       onChange={(e) => updateOverlay(idx, 'style', { textTransform: e.target.value })}
-                      className="w-full border border-gray-200 rounded p-1 text-xs"
+                      className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none bg-white"
                     >
                       {textTransformOptions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>

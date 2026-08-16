@@ -18,7 +18,7 @@ export default function SettingsPanel({
   uploadingHeader,
   panelDisabled,
   canLaunch,
-  headerImageEnabled,   // controls whether header image options are active
+  headerImageEnabled,
 }) {
   const [testNumber, setTestNumber] = useState('');
 
@@ -32,7 +32,7 @@ export default function SettingsPanel({
           <label className="text-[10px] font-semibold text-gray-400 uppercase">Messages Per Batch</label>
           <div className="flex items-center gap-2 mt-0.5">
             <input type="number" value={batchSize} onChange={(e) => setBatchSize(Number(e.target.value))}
-              min="1" max="500" className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2" />
+              min="1" max="500" className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow" />
             <span className="text-[10px] text-gray-400">contacts</span>
           </div>
         </div>
@@ -42,9 +42,9 @@ export default function SettingsPanel({
           <label className="text-[10px] font-semibold text-gray-400 uppercase">Wait Between Batches</label>
           <div className="flex items-center gap-2 mt-0.5">
             <input type="number" value={waitValue} onChange={(e) => setWaitValue(Number(e.target.value))}
-              min="1" max="999" className="w-20 bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2" />
+              min="1" max="999" className="w-20 bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow" />
             <select value={waitUnit} onChange={(e) => setWaitUnit(e.target.value)}
-              className="flex-1 bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2">
+              className="flex-1 bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow">
               <option value="seconds">Seconds</option>
               <option value="minutes">Minutes</option>
               <option value="hours">Hours</option>
@@ -57,7 +57,7 @@ export default function SettingsPanel({
         <div>
           <label className="text-[10px] font-semibold text-gray-400 uppercase">Start Sending At (optional)</label>
           <input type="datetime-local" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)}
-            className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5" />
+            className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow" />
         </div>
 
         {/* ─── Static Header Image ─────────────────────────────── */}
@@ -77,11 +77,11 @@ export default function SettingsPanel({
             type="file"
             accept="image/*"
             onChange={(e) => onHeaderImageUpload(e.target.files[0])}
-            className="w-full text-xs mt-1 border border-gray-200 rounded-lg p-1.5"
+            className="w-full text-xs mt-1 border border-gray-200 rounded-lg p-1.5 bg-white focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow"
             disabled={uploadingHeader || !headerImageEnabled}
           />
           {uploadingHeader && (
-            <span className="text-xs text-blue-600 flex items-center gap-1">
+            <span className="text-xs text-orange-600 flex items-center gap-1 mt-1">
               <i className="fas fa-spinner fa-spin"></i> Uploading...
             </span>
           )}
@@ -91,7 +91,7 @@ export default function SettingsPanel({
               <span className="text-[10px] text-green-600">✓ Image ready</span>
               <button
                 onClick={() => onHeaderImageUpload(null)}
-                className="text-red-500 hover:text-red-700 text-xs"
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors"
                 title="Remove image"
                 disabled={!headerImageEnabled}
               >
@@ -112,7 +112,7 @@ export default function SettingsPanel({
               className="sr-only peer"
               disabled={!headerImageEnabled}
             />
-            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-emerald-400 peer-checked:to-emerald-500"></div>
           </label>
         </div>
 
@@ -124,7 +124,7 @@ export default function SettingsPanel({
               <span className="text-xs text-gray-700 truncate flex-1">{selectedDesignName}</span>
               <button
                 onClick={onOpenDesignModal}
-                className="bg-white border border-gray-300 text-xs px-2 py-1 rounded hover:bg-gray-50"
+                className="bg-white border border-gray-300 text-xs px-2 py-1 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
               >
                 {selectedDesignName === 'None' ? 'Select' : 'Change'}
               </button>
@@ -133,7 +133,7 @@ export default function SettingsPanel({
         )}
 
         {/* Summary */}
-        <div className="bg-gray-50 rounded-lg p-2.5 text-[10px] space-y-1.5">
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-2.5 text-[10px] space-y-1.5 border border-gray-100">
           <div className="flex justify-between"><span>Variants Active:</span> <strong>{variantCount}</strong></div>
         </div>
 
@@ -147,7 +147,7 @@ export default function SettingsPanel({
         </button>
         <div>
           <input type="tel" value={testNumber} onChange={(e) => setTestNumber(e.target.value)}
-            placeholder="+234 801 234 5678" className="w-full border border-gray-200 rounded-lg p-2 text-xs mt-1" />
+            placeholder="+234 801 234 5678" className="w-full border border-gray-200 rounded-lg p-2 text-xs mt-1 bg-white focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow" />
         </div>
 
         {/* Progress */}
@@ -162,7 +162,7 @@ export default function SettingsPanel({
         <button
           onClick={onLaunch}
           disabled={panelDisabled || !canLaunch || isRunning || uploadingHeader}
-          className="w-full bg-emerald-500 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-emerald-600 transition shadow-md shadow-emerald-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:from-emerald-600 hover:to-emerald-700 transition shadow-md shadow-emerald-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <i className="fas fa-rocket"></i> <span>LAUNCH CAMPAIGN</span>
         </button>

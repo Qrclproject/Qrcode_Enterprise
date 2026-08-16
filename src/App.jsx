@@ -23,6 +23,7 @@ import CheckInSelectorPage from './pages/CheckInSelectorPage';
 import CheckInPage from './pages/CheckInPage';
 import CampaignDetailPage from './pages/CampaignDetailPage';
 import ScanHistoryPage from './pages/ScanHistoryPage';
+import AddRecipientsPage from './pages/AddRecipientsPage';
 import ExcelTestPage from './pages/ExcelTestPage';   // 👈 NEW import
 import MediaLibraryPage from './pages/MediaLibraryPage';
 export default function App() {
@@ -60,9 +61,13 @@ export default function App() {
                         onClick={() => setMobileMenuOpen(false)}
                       />
                     )}
-                    <main className="flex-1 flex flex-col h-screen overflow-hidden">
-                      <Header onToggleMobileMenu={toggleMobileMenu} />
+                  <main className="flex-1 flex flex-col h-screen overflow-hidden main-content-gradient">
+  <Header onToggleMobileMenu={toggleMobileMenu} />
+  <div className="flex-1 overflow-y-auto main-content-padding">
+
                       <Routes>
+                        
+<Route path="/campaigns/:campaignId/add-recipients" element={<AddRecipientsPage />} />
                         <Route path="/media" element={<MediaLibraryPage />} />
                         <Route path="/" element={<CampaignBuilderPage />} />
                         <Route path="/excel-test" element={<ExcelTestPage />} />  {/* 👈 Route added */}
@@ -78,7 +83,7 @@ export default function App() {
                         <Route path="/spreadsheet-editor" element={<SpreadsheetEditorPage />} />
                         <Route path="/templates/:templateId/variants/:variantIndex" element={<VariantEditPage />} />
                         <Route path="/no-access" element={<NoAccessPage />} />
-                      </Routes>
+                      </Routes>   </div>
                     </main>
                   </div>
                 </ProtectedRoute>

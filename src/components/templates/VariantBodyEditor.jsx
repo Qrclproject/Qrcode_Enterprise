@@ -64,29 +64,29 @@ export default function VariantBodyEditor({ value, onChange, showToolbar = false
   };
 
   return (
-    <div className={showToolbar ? 'border border-gray-300 rounded-lg overflow-hidden' : ''}>
+    <div className={showToolbar ? 'border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm' : ''}>
       {/* Toolbar – only when showToolbar is true */}
       {showToolbar && (
-        <div className="flex items-center gap-0.5 bg-gray-100 px-2 py-1 border-b border-gray-300 flex-wrap">
-          <button type="button" onClick={() => wrapSelection('*')} className="px-2 py-1 text-xs font-bold hover:bg-gray-200 rounded" title="Bold"><strong>B</strong></button>
-          <button type="button" onClick={() => wrapSelection('_')} className="px-2 py-1 text-xs italic hover:bg-gray-200 rounded" title="Italic"><em>I</em></button>
-          <button type="button" onClick={() => wrapSelection('~')} className="px-2 py-1 text-xs line-through hover:bg-gray-200 rounded" title="Strikethrough"><span className="line-through">S</span></button>
+        <div className="flex items-center gap-0.5 bg-gradient-to-b from-gray-50 to-gray-100 px-2 py-1 border-b border-gray-200 flex-wrap">
+          <button type="button" onClick={() => wrapSelection('*')} className="px-2 py-1 text-xs font-bold hover:bg-white rounded transition-colors" title="Bold"><strong>B</strong></button>
+          <button type="button" onClick={() => wrapSelection('_')} className="px-2 py-1 text-xs italic hover:bg-white rounded transition-colors" title="Italic"><em>I</em></button>
+          <button type="button" onClick={() => wrapSelection('~')} className="px-2 py-1 text-xs line-through hover:bg-white rounded transition-colors" title="Strikethrough"><span className="line-through">S</span></button>
           <span className="w-px h-5 bg-gray-300 mx-1"></span>
-          <button type="button" onClick={() => wrapSelection('`')} className="px-2 py-1 text-xs font-mono hover:bg-gray-200 rounded" title="Inline code">&lt;/&gt;</button>
-          <button type="button" onClick={() => wrapSelection('```\n', '\n```')} className="px-2 py-1 text-xs font-mono hover:bg-gray-200 rounded" title="Code block">&lt;/&gt; block</button>
+          <button type="button" onClick={() => wrapSelection('`')} className="px-2 py-1 text-xs font-mono hover:bg-white rounded transition-colors" title="Inline code">&lt;/&gt;</button>
+          <button type="button" onClick={() => wrapSelection('```\n', '\n```')} className="px-2 py-1 text-xs font-mono hover:bg-white rounded transition-colors" title="Code block">&lt;/&gt; block</button>
           <span className="w-px h-5 bg-gray-300 mx-1"></span>
           {/* Insert variable placeholder */}
           <button
             type="button"
             onClick={insertVariablePlaceholder}
-            className="px-1.5 py-0.5 text-[10px] border border-gray-300 rounded hover:bg-gray-200"
+            className="px-1.5 py-0.5 text-[10px] border border-orange-300 rounded bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors"
             title="Insert variable placeholder"
           >
             {'{{ }}'}
           </button>
           <span className="flex-1"></span>
-          <button type="button" onClick={() => document.execCommand('undo')} className="px-1.5 py-0.5 text-xs hover:bg-gray-200 rounded" title="Undo"><i className="fas fa-undo"></i></button>
-          <button type="button" onClick={() => document.execCommand('redo')} className="px-1.5 py-0.5 text-xs hover:bg-gray-200 rounded" title="Redo"><i className="fas fa-redo"></i></button>
+          <button type="button" onClick={() => document.execCommand('undo')} className="px-1.5 py-0.5 text-xs hover:bg-white rounded transition-colors" title="Undo"><i className="fas fa-undo"></i></button>
+          <button type="button" onClick={() => document.execCommand('redo')} className="px-1.5 py-0.5 text-xs hover:bg-white rounded transition-colors" title="Redo"><i className="fas fa-redo"></i></button>
         </div>
       )}
 
@@ -97,12 +97,14 @@ export default function VariantBodyEditor({ value, onChange, showToolbar = false
         value={value}
         onChange={handleChange}
         placeholder="Type your message… Use {{variable}} for placeholders."
-        className={`w-full border-gray-300 px-3 py-2 text-xs resize-y ${showToolbar ? 'border-0 focus:outline-none' : 'border rounded'}`}
+        className={`w-full border-gray-300 px-3 py-2 text-xs resize-y focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow ${
+          showToolbar ? 'border-0' : 'border rounded'
+        }`}
       />
 
       {/* Live preview */}
       {preview && (
-        <div className="mt-2 bg-gray-50 p-2 rounded border text-xs">
+        <div className="mt-2 bg-gradient-to-b from-gray-50 to-white p-2 rounded border text-xs shadow-sm">
           <p className="text-gray-400 mb-1 uppercase text-[10px] font-semibold">Preview</p>
           <div className="text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: preview }} />
         </div>
