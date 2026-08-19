@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/layout/Toast';
 import Button from '../components/common/Button';
+import Modal from '../components/common/Modal'; // ✅ Import for recipient details modal
 import {
   getCampaignById,
   retryFailedMessages,
@@ -32,6 +33,50 @@ function StatBadge({ label, value, color = 'gray', icon, subtitle }) {
   );
 }
 
+// ─── Recipient Details Modal ────────────────────────────────────
+function RecipientDetailModal({ recipient, onClose }) {
+  if (!recipient) return null;
+
+  // Display all fields from the recipient object
+  const fields = Object.entries(recipient).filter(
+    ([key]) => !['_id', 'qrUrl'].includes(key) // hide internal id and qr url (shown separately)
+  );
+
+  return (
+    <Modal isOpen={!!recipient} onClose={onClose} title="Recipient Details" size="max-w-md">
+      <div className="space-y-4">
+        {/* QR code image */}
+        {recipient.qrUrl && (
+          <div className="flex justify-center">
+            <img
+              src={recipient.qrUrl}
+              alt="QR Code"
+              className="w-32 h-32 object-contain border rounded-lg"
+            />
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {fields.map(([key, value]) => (
+            <div key={key} className="flex justify-between gap-4 py-1 border-b border-gray-100">
+              <span className="text-xs font-semibold text-gray-500 capitalize">{key}</span>
+              <span className="text-xs text-gray-800 text-right break-all">
+                {String(value ?? '—')}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function CampaignDetailPage() {
   const { campaignId } = useParams();
   const navigate = useNavigate();
@@ -44,9 +89,11 @@ export default function CampaignDetailPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [retrying, setRetrying] = useState(false);
   const [resettingId, setResettingId] = useState(null);
-  const [manualPhone, setManualPhone] = useState('');
 
-  // Fetch campaign data and template
+  // ─── Manual send state (dropdown selection) ─────────────────
+  const [selectedRecipientId, setSelectedRecipientId] = useState('');
+  const [detailRecipient, setDetailRecipient] = useState(null); // for modal
+
   const fetchCampaign = useCallback(async () => {
     try {
       const res = await getCampaignById(campaignId);
@@ -69,7 +116,6 @@ export default function CampaignDetailPage() {
     fetchCampaign();
   }, [fetchCampaign]);
 
-  // Retry all failed recipients
   const handleRetryAll = async () => {
     const failedCount = campaign?.recipients?.filter(r => r.status === 'failed').length || 0;
     if (failedCount === 0) {
@@ -89,7 +135,6 @@ export default function CampaignDetailPage() {
     }
   };
 
-  // Reset check‑in for a single recipient
   const handleResetCheckIn = async (recipient) => {
     const identifier = recipient._id || recipient.phone;
     if (!identifier) {
@@ -113,7 +158,6 @@ export default function CampaignDetailPage() {
   const openWhatsAppForRecipient = (phone, recipientData = null) => {
     const normalizedPhone = normalizePhone(phone).replace(/^\+/, '');
 
-    // Determine message body
     let messageBody = '';
     if (template && template.variants && template.variants.length > 0) {
       const activeIndex = (campaign.activeVariants && campaign.activeVariants[0]) || 0;
@@ -121,7 +165,6 @@ export default function CampaignDetailPage() {
       messageBody = variant.body || '';
     }
 
-    // Replace placeholders using campaign mapping and recipient data
     if (recipientData) {
       const mapping = campaign.mapping || {};
       messageBody = messageBody.replace(/\{\{(\d+)\}\}/g, (match, num) => {
@@ -133,7 +176,6 @@ export default function CampaignDetailPage() {
       });
     }
 
-    // Build final message: image URL first if available and header image enabled
     let finalMessage = '';
     const imageUrl = recipientData?.qrUrl || campaign.headerImageUrl || '';
     if (imageUrl && campaign.includeHeaderImage) {
@@ -147,27 +189,27 @@ export default function CampaignDetailPage() {
     window.open(waLink, '_blank');
   };
 
-  // Manual send from input
+  // ✅ Updated manual send handler – uses selected recipient from dropdown
   const handleOpenWhatsAppManual = () => {
-    const phone = manualPhone.trim();
-    if (!phone) {
-      showToast('warning', 'Missing Number', 'Please enter a phone number.');
+    if (!selectedRecipientId) {
+      showToast('warning', 'No recipient selected', 'Please choose a recipient from the dropdown.');
       return;
     }
-    // Try to find recipient by phone
     const recipient = campaign.recipients?.find(
-      r => r.phone === phone || r.phone === '+' + phone || r.phone === phone.replace(/^\+/, '')
+      r => (r._id || r.phone) === selectedRecipientId
     );
-    openWhatsAppForRecipient(phone, recipient);
+    if (recipient) {
+      openWhatsAppForRecipient(recipient.phone, recipient);
+    }
   };
 
-  // Export recipients to CSV
+  // ✅ Export CSV remains unchanged
   const exportCSV = () => {
     if (!campaign?.recipients?.length) {
       showToast('warning', 'No data', 'No recipients to export.');
       return;
     }
-    const headers = ['Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
+    const headers = ['Attendee Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
     const rows = campaign.recipients.map(r => [
       r.name || '',
       r.phone || '',
@@ -188,7 +230,7 @@ export default function CampaignDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-orange-50/30">
         <i className="fas fa-spinner fa-pulse text-3xl text-gray-400"></i>
       </div>
     );
@@ -241,8 +283,11 @@ export default function CampaignDetailPage() {
       : <span className="text-xs text-gray-400"><i className="fas fa-circle"></i> Not checked</span>;
   };
 
+  // Selected recipient object for preview in manual send
+  const selectedManualRecipient = recipients.find(r => (r._id || r.phone) === selectedRecipientId);
+
   return (
-    <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50">
+    <div className="flex-1 overflow-y-auto p-5 bg-gradient-to-br from-gray-50 via-white to-orange-50/30">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-wrap justify-between items-center gap-3">
@@ -280,24 +325,51 @@ export default function CampaignDetailPage() {
           </div>
         </div>
 
-        {/* Manual Send Section */}
+        {/* Manual Send Section with Dropdown */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <h2 className="text-sm font-bold text-gray-700 mb-3">Send Manual Message via WhatsApp</h2>
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="tel"
-              value={manualPhone}
-              onChange={(e) => setManualPhone(e.target.value)}
-              placeholder="Enter phone number (e.g., +2348012345678)"
-              className="flex-1 min-w-[200px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
-            />
+            <select
+              value={selectedRecipientId}
+              onChange={(e) => setSelectedRecipientId(e.target.value)}
+              className="flex-1 min-w-[200px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none bg-white"
+            >
+              <option value="">-- Select Recipient --</option>
+              {recipients.map(r => (
+                <option key={r._id || r.phone} value={r._id || r.phone}>
+                  {r.name || 'Unknown'} ({r.phone})
+                </option>
+              ))}
+            </select>
             <Button variant="primary" onClick={handleOpenWhatsAppManual}>
               <i className="fas fa-external-link-alt mr-1"></i> Send via WhatsApp
             </Button>
           </div>
-          <p className="text-xs text-gray-400 mt-1">
-            Or use the per‑recipient buttons in the table below.
-          </p>
+
+          {/* Preview of selected recipient details */}
+          {selectedManualRecipient && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-xs font-semibold text-gray-500 mb-2">Selected Recipient Details:</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <span className="text-gray-500">Attendee Name:</span>
+                <span className="font-medium">{selectedManualRecipient.name || '—'}</span>
+                <span className="text-gray-500">Phone:</span>
+                <span className="font-medium">{selectedManualRecipient.phone}</span>
+                <span className="text-gray-500">Status:</span>
+                <span>{statusBadge(selectedManualRecipient.status)}</span>
+                <span className="text-gray-500">Check‑In:</span>
+                <span>{checkInBadge(selectedManualRecipient.checkedIn)}</span>
+                {selectedManualRecipient.qrUrl && (
+                  <>
+                    <span className="text-gray-500">QR Code:</span>
+                    <span>
+                      <img src={selectedManualRecipient.qrUrl} alt="QR" className="w-12 h-12 object-contain border rounded" />
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Summary Cards */}
@@ -332,7 +404,7 @@ export default function CampaignDetailPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:border-orange-500 outline-none"
+              className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:border-orange-500 outline-none bg-white"
             >
               <option value="all">All</option>
               <option value="sent">Sent</option>
@@ -346,7 +418,7 @@ export default function CampaignDetailPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or phone..."
-              className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+              className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none bg-white"
             />
           </div>
           <div className="text-xs text-gray-500">
@@ -380,7 +452,16 @@ export default function CampaignDetailPage() {
                   <tr key={r._id || idx} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">{r.name || '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{r.phone}</td>
+                    <td className="px-4 py-3">
+                      {/* Clickable phone number */}
+                      <button
+                        onClick={() => setDetailRecipient(r)}
+                        className="font-mono text-xs text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline"
+                        title="View details"
+                      >
+                        {r.phone}
+                      </button>
+                    </td>
                     <td className="px-4 py-3">{statusBadge(r.status)}</td>
                     <td className="px-4 py-3">
                       {r.qrUrl ? (
@@ -399,7 +480,6 @@ export default function CampaignDetailPage() {
                     <td className="px-4 py-3">{checkInBadge(r.checkedIn)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        {/* Send via WhatsApp button */}
                         <button
                           onClick={() => openWhatsAppForRecipient(r.phone, r)}
                           className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition"
@@ -408,7 +488,6 @@ export default function CampaignDetailPage() {
                           <i className="fab fa-whatsapp mr-1"></i> Send
                         </button>
 
-                        {/* Reset button (only if checked in) */}
                         {r.checkedIn && (
                           <button
                             onClick={() => handleResetCheckIn(r)}
@@ -473,6 +552,12 @@ export default function CampaignDetailPage() {
             <i className="fas fa-check-circle mr-1"></i> No failed recipients in this campaign.
           </div>
         )}
+
+        {/* Recipient Detail Modal */}
+        <RecipientDetailModal
+          recipient={detailRecipient}
+          onClose={() => setDetailRecipient(null)}
+        />
       </div>
     </div>
   );
