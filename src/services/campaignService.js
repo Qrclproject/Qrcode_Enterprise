@@ -49,7 +49,7 @@ export const getCampaignQRProgress = (campaignId) =>
 // Delete a single campaign
 export const deleteCampaign = (id) =>
   api.delete(`/campaigns/${id}`);
-
+export const renameCampaign = (campaignId, name) => api.put(`/campaigns/${campaignId}/rename`, { name });
 // Delete ALL campaigns for the current user (clears history)
 export const deleteAllCampaigns = () =>
   api.delete('/campaigns');

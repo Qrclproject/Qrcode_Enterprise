@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Modal from '../components/common/Modal';
+import Button from '../components/common/Button'; // ✅ new import
 import { useToast } from '../components/layout/Toast';
 import api from '../services/api';
-import * as XLSX from 'xlsx';   // for Excel export
+import * as XLSX from 'xlsx';
 
 export default function ScanHistoryPage() {
   const { campaignId } = useParams();
@@ -20,9 +21,15 @@ export default function ScanHistoryPage() {
   const [selectedScan, setSelectedScan] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Debounce search
+  // ✅ Delete states
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [scanToDelete, setScanToDelete] = useState(null);
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
+  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -31,7 +38,6 @@ export default function ScanHistoryPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Fetch scan history from backend
   const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
@@ -77,12 +83,44 @@ export default function ScanHistoryPage() {
     setModalOpen(true);
   };
 
+  // ✅ Delete handlers
+  const openDeleteModal = (scan) => {
+    setScanToDelete(scan);
+    setDeleteModalOpen(true);
+    setPasscodeInput('');
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setScanToDelete(null);
+    setPasscodeInput('');
+  };
+
+  const confirmDeleteScan = async () => {
+    if (!passcodeInput.trim()) {
+      showToast('warning', 'Passcode required', 'Enter the settings passcode to delete.');
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.delete(`/campaigns/${campaignId}/scan-history/${scanToDelete._id}`, {
+        data: { passcode: passcodeInput },
+      });
+      showToast('success', 'Deleted', 'Scan history entry removed.');
+      closeDeleteModal();
+      fetchHistory();
+    } catch (err) {
+      showToast('error', 'Delete failed', err.response?.data?.message || err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const statusBadge = (status) =>
     status === 'success'
       ? 'bg-green-100 text-green-700'
       : 'bg-red-100 text-red-700';
 
-  // Helper to get attendee display name without phone
   const getAttendeeDisplay = (scan) => {
     if (scan.qrDataFields && scan.qrDataFields.length > 0) {
       const nameField = scan.qrDataFields.find(f => f.label.toLowerCase().includes('name')) || scan.qrDataFields[0];
@@ -91,7 +129,7 @@ export default function ScanHistoryPage() {
     return 'Attendee';
   };
 
-  // Apply status filter client-side
+  // Filter by status
   const filteredHistory = statusFilter === 'all'
     ? history
     : history.filter(scan => scan.status === statusFilter);
@@ -158,7 +196,6 @@ export default function ScanHistoryPage() {
     showToast('success', 'Excel exported', 'Download started.');
   };
 
-  // ─── PDF Export via print dialog ─────────────────────────────
   const exportPDF = () => {
     const data = getExportData();
     if (data.length === 0) {
@@ -202,7 +239,6 @@ export default function ScanHistoryPage() {
     printWindow.print();
   };
 
-  // ─── DOC Export (Word-compatible HTML) ───────────────────────
   const exportDOC = () => {
     const data = getExportData();
     if (data.length === 0) {
@@ -256,34 +292,19 @@ export default function ScanHistoryPage() {
             <i className="fas fa-history text-orange-500"></i> Scan History
           </h1>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={exportCSV}
-              className="text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium transition"
-            >
+            <button onClick={exportCSV} className="text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium transition">
               <i className="fas fa-file-csv mr-1"></i> CSV
             </button>
-            <button
-              onClick={exportExcel}
-              className="text-sm bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-medium transition"
-            >
+            <button onClick={exportExcel} className="text-sm bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-medium transition">
               <i className="fas fa-file-excel mr-1"></i> Excel
             </button>
-            <button
-              onClick={exportPDF}
-              className="text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg font-medium transition"
-            >
+            <button onClick={exportPDF} className="text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg font-medium transition">
               <i className="fas fa-file-pdf mr-1"></i> PDF
             </button>
-            <button
-              onClick={exportDOC}
-              className="text-sm bg-purple-500 hover:bg-purple-600 text-white px-3 py-1.5 rounded-lg font-medium transition"
-            >
+            <button onClick={exportDOC} className="text-sm bg-purple-500 hover:bg-purple-600 text-white px-3 py-1.5 rounded-lg font-medium transition">
               <i className="fas fa-file-word mr-1"></i> DOC
             </button>
-            <button
-              onClick={() => navigate(-1)}
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
+            <button onClick={() => navigate(-1)} className="text-sm text-gray-500 hover:text-gray-700">
               ← Back
             </button>
           </div>
@@ -302,11 +323,7 @@ export default function ScanHistoryPage() {
                 className="w-full pl-8 pr-10 py-2 border border-gray-200 rounded-lg text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
               />
               {search && (
-                <button
-                  type="button"
-                  onClick={clearSearch}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+                <button type="button" onClick={clearSearch} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <i className="fas fa-times-circle"></i>
                 </button>
               )}
@@ -323,9 +340,7 @@ export default function ScanHistoryPage() {
             <option value="failed">Failed</option>
           </select>
 
-          <span className="text-xs text-gray-500">
-            {totalCount} result(s)
-          </span>
+          <span className="text-xs text-gray-500">{totalCount} result(s)</span>
         </div>
 
         {filteredHistory.length === 0 ? (
@@ -341,15 +356,13 @@ export default function ScanHistoryPage() {
                     <th className="px-4 py-3 text-left">Attendee</th>
                     <th className="px-4 py-3 text-left">Status</th>
                     <th className="px-4 py-3 text-left">Time</th>
-                    <th className="px-4 py-3 text-left">Action</th>
+                    <th className="px-4 py-3 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredHistory.map((scan, idx) => (
                     <tr key={idx} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-800">
-                        {getAttendeeDisplay(scan)}
-                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-800">{getAttendeeDisplay(scan)}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(scan.status)}`}>
                           {scan.status}
@@ -359,12 +372,20 @@ export default function ScanHistoryPage() {
                         {new Date(scan.timestamp).toLocaleString()}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => openDetails(scan)}
-                          className="text-blue-600 hover:underline text-xs"
-                        >
-                          View
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => openDetails(scan)}
+                            className="text-blue-600 hover:underline text-xs"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(scan)}
+                            className="text-red-600 hover:underline text-xs"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -409,7 +430,6 @@ export default function ScanHistoryPage() {
             <p><strong>Time:</strong> {new Date(selectedScan.timestamp).toLocaleString()}</p>
             {selectedScan.message && <p><strong>Message:</strong> {selectedScan.message}</p>}
 
-            {/* Display QR Data Content fields if available */}
             {selectedScan.qrDataFields && selectedScan.qrDataFields.length > 0 ? (
               <div className="border-t pt-2 mt-2">
                 <p className="font-semibold text-gray-700 mb-1">Attendee Details</p>
@@ -427,6 +447,34 @@ export default function ScanHistoryPage() {
             <button onClick={() => setModalOpen(false)} className="bg-gray-200 px-4 py-2 rounded text-sm">
               Close
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ✅ Delete Scan Modal (requires passcode) */}
+      {deleteModalOpen && (
+        <Modal isOpen={deleteModalOpen} onClose={closeDeleteModal} title="Delete Scan Entry">
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              This action will permanently delete this scan record. Enter the settings passcode to confirm.
+            </p>
+            <input
+              type="password"
+              value={passcodeInput}
+              onChange={(e) => setPasscodeInput(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+              placeholder="Passcode"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && confirmDeleteScan()}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={closeDeleteModal} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={confirmDeleteScan} disabled={deleting}>
+                {deleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
           </div>
         </Modal>
       )}
