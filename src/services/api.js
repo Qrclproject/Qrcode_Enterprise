@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// Get the base URL from environment variables, defaulting to the local server
+const baseEnvURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api',
+  // Automatically appends /api if it isn't explicitly included in the environment variable string
+  baseURL: baseEnvURL.endsWith('/api') ? baseEnvURL : `${baseEnvURL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
