@@ -285,7 +285,7 @@ export default function SettingsPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
               <h2 className="font-bold text-gray-700">Webhook URL</h2>
               <div className="flex items-center gap-2 mt-2">
-                <code className="bg-gray-100 px-3 py-2 rounded-lg text-xs flex-1">https://qrclbackendevent.onrender.com/api/whatsapp/webhook</code>
+                <code className="bg-gray-100 px-3 py-2 rounded-lg text-xs flex-1">https://qrcode-enterprise-backend.onrender.com/api/whatsapp/webhook</code>
                 <button onClick={copyWebhookUrl} className="text-gray-400 hover:text-orange-600"><i className="far fa-copy"></i></button>
               </div>
             </div>
