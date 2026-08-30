@@ -188,7 +188,7 @@ export default function SettingsPage() {
   // ─── Test connection ────────────────────────────────────────────
   const testConnection = () => showToast('info', 'Testing...', 'Connection successful.');
   const copyWebhookUrl = () => {
-    navigator.clipboard.writeText('https://qrclbackendevent.onrender.com/api/whatsapp/webhook');
+    navigator.clipboard.writeText('https://qrcode-enterprise-backend.onrender.com/api/whatsapp/webhook');
     showToast('success', 'Copied', 'Webhook URL copied.');
   };
 
