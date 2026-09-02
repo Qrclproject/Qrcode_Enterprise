@@ -9,15 +9,10 @@ import {
   retryFailedMessages,
   launchCampaign,
   deleteAllCampaigns,
-  renameCampaign,   // ✅ new import
+  renameCampaign,
 } from '../services/campaignService';
 
 // ─── Helper functions ─────────────────────────────────────────────
-const formatWaitDisplay = (value, unit) => {
-  const abbr = { seconds: 'sec', minutes: 'min', hours: 'hr', days: 'day(s)' };
-  return `${value} ${abbr[unit] || unit}`;
-};
-
 const formatDuration = (seconds) => {
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.ceil(seconds / 60)}m`;
@@ -29,17 +24,6 @@ const formatDuration = (seconds) => {
   const d = Math.floor(seconds / 86400);
   const h = Math.round((seconds % 86400) / 3600);
   return h > 0 ? `${d}d ${h}h` : `${d}d`;
-};
-
-const getWaitSeconds = (value, unit) => {
-  const v = parseInt(value) || 1;
-  switch (unit) {
-    case 'seconds': return v;
-    case 'minutes': return v * 60;
-    case 'hours': return v * 3600;
-    case 'days': return v * 86400;
-    default: return v * 60;
-  }
 };
 
 // ─── Improved Stat Card with icon ────────────────────────────────
@@ -94,19 +78,14 @@ export default function SentHistoryPage() {
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 30;
 
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
 
-  // ✅ Rename modal state
+  // Rename modal state
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameCampaignId, setRenameCampaignId] = useState(null);
   const [newCampaignName, setNewCampaignName] = useState('');
-
-  const [editBatchSize, setEditBatchSize] = useState(10);
-  const [editWaitValue, setEditWaitValue] = useState(5);
-  const [editWaitUnit, setEditWaitUnit] = useState('minutes');
 
   const showToast = useToast();
 
@@ -172,11 +151,10 @@ export default function SentHistoryPage() {
     setDeleteAllModalOpen(false);
   };
 
-  // ─── Retry functions ──────────────────────────────────────────
-  const retryAllFailed = async () => {
-    if (!selectedCampaign) return;
+  // ─── Retry failed messages ─────────────────────────────────────
+  const retryAllFailed = async (campaign) => {
     try {
-      await retryFailedMessages(selectedCampaign._id);
+      await retryFailedMessages(campaign._id);
       showToast('success', 'Retry started', 'Retrying all failed messages...');
       fetchCampaigns();
     } catch (err) {
@@ -184,42 +162,12 @@ export default function SentHistoryPage() {
     }
   };
 
-  // ─── Resend with new settings ─────────────────────────────────
-  const applyAndResend = async () => {
-    if (!selectedCampaign) return;
-    try {
-      await launchCampaign(selectedCampaign._id);
-      showToast('success', 'Resend Initiated', 'Campaign restarted.');
-      fetchCampaigns();
-    } catch (err) {
-      showToast('error', 'Resend failed', err.message);
-    }
-    closeEditModal();
+  // ─── Open campaign in builder for editing ──────────────────────
+  const openInCampaignBuilder = (campaign) => {
+    navigate('/', { state: { campaignToLoad: campaign } });
   };
 
-  // ─── Edit modal ───────────────────────────────────────────────
-  const openEditModal = (campaignId) => {
-    const campaign = campaigns.find(c => c._id === campaignId);
-    if (!campaign) return;
-    setSelectedCampaign(campaign);
-    setEditBatchSize(campaign.batchSize || 10);
-    setEditWaitValue(campaign.waitValue || 5);
-    setEditWaitUnit(campaign.waitUnit || 'minutes');
-    setEditModalOpen(true);
-  };
-
-  const closeEditModal = () => {
-    setEditModalOpen(false);
-    setSelectedCampaign(null);
-  };
-
-  const openInCampaignBuilder = () => {
-    if (!selectedCampaign) return;
-    navigate('/', { state: { campaignToLoad: selectedCampaign } });
-    closeEditModal();
-  };
-
-  // ✅ Rename functions
+  // ─── Rename functions ─────────────────────────────────────────
   const openRenameModal = (campaign) => {
     setRenameCampaignId(campaign._id);
     setNewCampaignName(campaign.name);
@@ -241,7 +189,6 @@ export default function SentHistoryPage() {
     setRenameModalOpen(false);
   };
 
-  // ─── Loading state ─────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -250,7 +197,6 @@ export default function SentHistoryPage() {
     );
   }
 
-  // ─── Main render ───────────────────────────────────────────
   return (
     <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -264,7 +210,7 @@ export default function SentHistoryPage() {
               Sent History
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              View, edit batch settings, retry failures, and resend campaigns with full control.
+              View, edit, retry failures, and resend campaigns with full control.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -365,7 +311,6 @@ export default function SentHistoryPage() {
                         </td>
                         <td className="px-5 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {/* ✅ Rename button */}
                             <button
                               onClick={() => openRenameModal(c)}
                               className="text-gray-400 hover:text-orange-600"
@@ -374,7 +319,7 @@ export default function SentHistoryPage() {
                               <i className="fas fa-pen"></i>
                             </button>
                             <button
-                              onClick={() => openEditModal(c._id)}
+                              onClick={() => openInCampaignBuilder(c)}
                               className="text-gray-400 hover:text-indigo-600"
                               title="Edit & Resend"
                             >
@@ -433,13 +378,6 @@ export default function SentHistoryPage() {
         </div>
       </div>
 
-      {/* ========== Edit / Resend Modal ========== */}
-      {selectedCampaign && (
-        <Modal isOpen={editModalOpen} onClose={closeEditModal} title="Edit Campaign" size="max-w-5xl">
-          {/* ... modal content unchanged ... */}
-        </Modal>
-      )}
-
       {/* ========== Rename Modal ========== */}
       <Modal isOpen={renameModalOpen} onClose={() => setRenameModalOpen(false)} title="Rename Campaign">
         <div className="space-y-3">
@@ -482,27 +420,4 @@ export default function SentHistoryPage() {
       </Modal>
     </div>
   );
-}
-
-// ─── Helper sub‑components ─────────────────────────────────────
-function StatBox({ label, value, color = 'gray' }) {
-  const colorMap = {
-    green: 'bg-green-50 text-green-700',
-    red: 'bg-red-50 text-red-700',
-    amber: 'bg-amber-50 text-amber-700',
-    gray: 'bg-gray-50 text-gray-800',
-  };
-  return (
-    <div className={`rounded-lg p-3 text-center ${colorMap[color] || colorMap.gray}`}>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-xl font-bold">{value}</p>
-    </div>
-  );
-}
-
-function generateSampleMessage(campaign) {
-  if (campaign.templateKey === 'tpl1') {
-    return `<p>Hello <strong>John Doe</strong> <i class="fas fa-hand-sparkles text-orange-500"></i><br><br>Here is your entry pass for "<strong>${campaign.name?.replace(' Passes', '') || campaign.name}</strong>".<br><br>Please present your QR code at the gate.<br><br>See you there!</p>`;
-  }
-  return `<p>Hi <strong>John Doe</strong>, your pass for ${campaign.name} is attached.</p>`;
 }
