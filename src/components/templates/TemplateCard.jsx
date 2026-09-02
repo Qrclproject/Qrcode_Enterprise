@@ -28,7 +28,6 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
           <i className={`fas fa-${categoryIcon(template.category)} text-${categoryColor(template.category)}-600`}></i>
         </div>
         <div className="flex gap-1">
-          {/* ─── Edit Variants (pencil) ──────────────────────────── */}
           <button
             onClick={() => onEdit(templateId)}
             className="text-gray-400 hover:text-orange-600 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200"
@@ -36,7 +35,6 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
           >
             <i className="fas fa-edit"></i>
           </button>
-          {/* ─── Edit Properties (gear) ──────────────────────────── */}
           {onEditProperties && (
             <button
               onClick={() => onEditProperties(template)}
@@ -66,6 +64,20 @@ export default function TemplateCard({ template, onEdit, onClone, onDelete, sele
         <span className="inline-block mt-1 text-[10px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
           {buttonLabel}
         </span>
+      )}
+
+      {/* Quick Reply Buttons */}
+      {template.quickReplies?.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {template.quickReplies.map((qr, idx) => (
+            <span
+              key={idx}
+              className="text-[9px] bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded-full"
+            >
+              {qr}
+            </span>
+          ))}
+        </div>
       )}
 
       <div className="flex flex-wrap gap-1 mt-1.5">
