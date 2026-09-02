@@ -8,6 +8,7 @@ import {
   getCampaignById,
   retryFailedMessages,
   resetRecipientCheckIn,
+  getCampaignMessages,
 } from '../services/campaignService';
 import { getTemplateById } from '../services/templateService';
 import { normalizePhone } from '../utils/formatters';
@@ -96,6 +97,12 @@ export default function CampaignDetailPage() {
   // ─── State for message thread modal ─────────────────────────
   const [messageRecipient, setMessageRecipient] = useState(null);
 
+  // ─── NEW: State for real‑time unread indicators ─────────────
+  const [baselineMessageIds, setBaselineMessageIds] = useState(new Set());
+  const [newMessagePhones, setNewMessagePhones] = useState(new Set());
+  const [openedThreadPhones, setOpenedThreadPhones] = useState(new Set());
+
+  // Fetch campaign details (existing)
   const fetchCampaign = useCallback(async () => {
     try {
       const res = await getCampaignById(campaignId);
@@ -117,6 +124,55 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     fetchCampaign();
   }, [fetchCampaign]);
+
+  // ─── NEW: Poll for new messages ────────────────────────────
+  const fetchAllMessages = useCallback(async () => {
+    try {
+      const data = await getCampaignMessages(campaignId);
+      const messages = data.data || data;
+
+      if (baselineMessageIds.size === 0) {
+        // First fetch: set baseline to all current message IDs
+        setBaselineMessageIds(new Set(messages.map(m => m._id || m.whatsappMessageId)));
+      } else {
+        const newIncomingPhones = new Set();
+        for (const msg of messages) {
+          const msgId = msg._id || msg.whatsappMessageId;
+          if (!baselineMessageIds.has(msgId) && msg.direction === 'incoming') {
+            const phone = msg.phone;
+            if (!openedThreadPhones.has(phone)) {
+              newIncomingPhones.add(phone);
+            }
+          }
+        }
+        if (newIncomingPhones.size > 0) {
+          setNewMessagePhones(prev => new Set([...prev, ...newIncomingPhones]));
+        }
+        setBaselineMessageIds(new Set(messages.map(m => m._id || m.whatsappMessageId)));
+      }
+    } catch (err) {
+      console.error('Failed to fetch all messages for unread indicators:', err);
+    }
+  }, [campaignId, baselineMessageIds, openedThreadPhones]);
+
+  useEffect(() => {
+    if (!campaignId) return;
+    fetchAllMessages();
+    const interval = setInterval(fetchAllMessages, 10000);
+    return () => clearInterval(interval);
+  }, [campaignId, fetchAllMessages]);
+
+  // When user opens a message thread, mark that phone as "opened" and remove from new flags
+  const handleOpenMessages = (recipient) => {
+    const phone = normalizePhone(recipient.phone);
+    setMessageRecipient(recipient);
+    setNewMessagePhones(prev => {
+      const next = new Set(prev);
+      next.delete(phone);
+      return next;
+    });
+    setOpenedThreadPhones(prev => new Set(prev).add(phone));
+  };
 
   const handleRetryAll = async () => {
     const failedCount = campaign?.recipients?.filter(r => r.status === 'failed').length || 0;
@@ -444,71 +500,75 @@ export default function CampaignDetailPage() {
                   </td>
                 </tr>
               ) : (
-                filteredRecipients.map((r, idx) => (
-                  <tr key={r._id || idx} className="hover:bg-gray-50 transition">
-                    <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
-                    <td className="px-4 py-3 font-medium">{r.name || '—'}</td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => setDetailRecipient(r)}
-                        className="font-mono text-xs text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline"
-                        title="View details"
-                      >
-                        {normalizePhone(r.phone)}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">{statusBadge(r.status)}</td>
-                    <td className="px-4 py-3">
-                      {r.qrUrl ? (
-                        <a
-                          href={r.qrUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block w-10 h-10 border rounded overflow-hidden"
-                        >
-                          <img src={r.qrUrl} alt="QR" className="w-full h-full object-cover" />
-                        </a>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">{checkInBadge(r.checkedIn)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
+                filteredRecipients.map((r, idx) => {
+                  const phoneNormalized = normalizePhone(r.phone);
+                  const hasNew = newMessagePhones.has(phoneNormalized);
+                  return (
+                    <tr key={r._id || idx} className="hover:bg-gray-50 transition">
+                      <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
+                      <td className="px-4 py-3 font-medium">{r.name || '—'}</td>
+                      <td className="px-4 py-3">
                         <button
-                          onClick={() => openWhatsAppForRecipient(r.phone, r)}
-                          className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition"
-                          title="Send message via WhatsApp"
+                          onClick={() => setDetailRecipient(r)}
+                          className="font-mono text-xs text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline"
+                          title="View details"
                         >
-                          <i className="fab fa-whatsapp mr-1"></i> Send
+                          {phoneNormalized}
                         </button>
-
-                        {/* View Messages button */}
-                        <button
-                          onClick={() => setMessageRecipient(r)}
-                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-200 transition"
-                          title="View customer responses"
-                        >
-                          <i className="fas fa-comments mr-1"></i> Messages
-                        </button>
-
-                        {r.checkedIn && (
-                          <button
-                            onClick={() => handleResetCheckIn(r)}
-                            disabled={resettingId === (r._id || r.phone)}
-                            className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 transition disabled:opacity-50"
+                      </td>
+                      <td className="px-4 py-3">{statusBadge(r.status)}</td>
+                      <td className="px-4 py-3">
+                        {r.qrUrl ? (
+                          <a
+                            href={r.qrUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block w-10 h-10 border rounded overflow-hidden"
                           >
-                            {resettingId === (r._id || r.phone) ? (
-                              <><i className="fas fa-spinner fa-spin mr-1"></i>Resetting...</>
-                            ) : (
-                              <><i className="fas fa-undo-alt mr-1"></i>Reset</>
+                            <img src={r.qrUrl} alt="QR" className="w-full h-full object-cover" />
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">{checkInBadge(r.checkedIn)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => openWhatsAppForRecipient(r.phone, r)}
+                            className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition"
+                            title="Send message via WhatsApp"
+                          >
+                            <i className="fab fa-whatsapp mr-1"></i> Send
+                          </button>
+                          <button
+                            onClick={() => handleOpenMessages(r)}
+                            className="relative text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-200 transition"
+                            title="View customer responses"
+                          >
+                            <i className="fas fa-comments mr-1"></i> Messages
+                            {hasNew && (
+                              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
                             )}
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {r.checkedIn && (
+                            <button
+                              onClick={() => handleResetCheckIn(r)}
+                              disabled={resettingId === (r._id || r.phone)}
+                              className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 transition disabled:opacity-50"
+                            >
+                              {resettingId === (r._id || r.phone) ? (
+                                <><i className="fas fa-spinner fa-spin mr-1"></i>Resetting...</>
+                              ) : (
+                                <><i className="fas fa-undo-alt mr-1"></i>Reset</>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -564,21 +624,20 @@ export default function CampaignDetailPage() {
         />
 
         {/* Message Thread Modal */}
-       {/* Message Thread Modal */}
-<Modal
-  isOpen={!!messageRecipient}
-  onClose={() => setMessageRecipient(null)}
-  title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient ? normalizePhone(messageRecipient.phone) : ''})`}
-  size="max-w-2xl"
->
-  {messageRecipient && (
-    <MessageThread
-      campaignId={campaignId}
-      phone={normalizePhone(messageRecipient.phone)}
-      showHeader={false}
-    />
-  )}
-</Modal>
+        <Modal
+          isOpen={!!messageRecipient}
+          onClose={() => setMessageRecipient(null)}
+          title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient ? normalizePhone(messageRecipient.phone) : ''})`}
+          size="max-w-2xl"
+        >
+          {messageRecipient && (
+            <MessageThread
+              campaignId={campaignId}
+              phone={normalizePhone(messageRecipient.phone)}
+              showHeader={false}
+            />
+          )}
+        </Modal>
       </div>
     </div>
   );
