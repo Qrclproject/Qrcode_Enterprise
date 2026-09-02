@@ -63,10 +63,12 @@ export const addRecipientsToCampaign = (campaignId, recipients, options = {}) =>
     generateQr: options.generateQr || false,
     sendNow: options.sendNow || false,
   });
-export const getCampaignMessages = (campaignId, recipientId) =>
-  api.get(`/campaigns/${campaignId}/messages`, {
-    params: recipientId ? { recipientId } : {},
-  });
+export const getCampaignMessages = (campaignId, phone, recipientId) => {
+  const params = {};
+  if (phone) params.phone = phone;
+  else if (recipientId) params.recipientId = recipientId;
+  return api.get(`/campaigns/${campaignId}/messages`, { params });
+};
 // Send manual WhatsApp message to a specific number
 export const sendManualMessage = (campaignId, phone, variables = {}) =>
   api.post(`/campaigns/${campaignId}/send-manual`, { phone, variables });

@@ -51,8 +51,9 @@ export const normalizePhone = (phone) => {
     // Assume Nigerian local number: replace leading 0 with 234
     cleaned = '234' + cleaned.slice(1);
   }
-  if (!cleaned.startsWith('+')) {
-    cleaned = '+' + cleaned;
+  if (!cleaned.startsWith('234')) {
+    // If not international, assume it's local and add 234
+    cleaned = '234' + cleaned;
   }
-  return cleaned;
+  return cleaned; // digits only, e.g. "2349133281741"
 };

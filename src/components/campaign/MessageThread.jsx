@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getCampaignMessages } from '../../services/campaignService';
 import { useToast } from '../../hooks/useToast';
 
-export default function MessageThread({ campaignId, recipientId, showHeader = true }) {
+export default function MessageThread({ campaignId, phone, showHeader = true }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,9 +13,9 @@ export default function MessageThread({ campaignId, recipientId, showHeader = tr
     const fetchMessages = async () => {
       try {
         setLoading(true);
-        const data = await getCampaignMessages(campaignId, recipientId);
+        const data = await getCampaignMessages(campaignId, phone);
         if (isMounted) {
-          setMessages(data.data || data); // assume response shape { success, data }
+          setMessages(data.data || data);
           setError(null);
         }
       } catch (err) {
@@ -29,14 +29,12 @@ export default function MessageThread({ campaignId, recipientId, showHeader = tr
     };
 
     fetchMessages();
-
-    // Optional: poll every 10 seconds for new incoming messages
     const interval = setInterval(fetchMessages, 10000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [campaignId, recipientId]);
+  }, [campaignId, phone]);
 
   if (loading && messages.length === 0) {
     return <div className="p-4 text-center text-gray-400 text-sm">Loading messages…</div>;
@@ -51,7 +49,7 @@ export default function MessageThread({ campaignId, recipientId, showHeader = tr
       {showHeader && (
         <div className="border-b border-gray-200 pb-2 mb-3">
           <h3 className="text-sm font-semibold text-gray-700">
-            Conversation {recipientId ? `with ${recipientId}` : 'All Messages'}
+            Conversation {phone ? `with ${phone}` : 'All Messages'}
           </h3>
         </div>
       )}

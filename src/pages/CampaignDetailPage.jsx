@@ -564,20 +564,21 @@ export default function CampaignDetailPage() {
         />
 
         {/* Message Thread Modal */}
-        <Modal
-          isOpen={!!messageRecipient}
-          onClose={() => setMessageRecipient(null)}
-          title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient ? normalizePhone(messageRecipient.phone) : ''})`}
-          size="max-w-2xl"
-        >
-          {messageRecipient && (
-            <MessageThread
-              campaignId={campaignId}
-              recipientId={messageRecipient._id}
-              showHeader={false}
-            />
-          )}
-        </Modal>
+       {/* Message Thread Modal */}
+<Modal
+  isOpen={!!messageRecipient}
+  onClose={() => setMessageRecipient(null)}
+  title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient ? normalizePhone(messageRecipient.phone) : ''})`}
+  size="max-w-2xl"
+>
+  {messageRecipient && (
+    <MessageThread
+      campaignId={campaignId}
+      phone={normalizePhone(messageRecipient.phone)}
+      showHeader={false}
+    />
+  )}
+</Modal>
       </div>
     </div>
   );
