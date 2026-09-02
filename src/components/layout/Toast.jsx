@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 
-const ToastContext = createContext(null);
+// Export the context once
+export const ToastContext = createContext(null);
 
 export function ToastProvider({ children }) {
   const [toast, setToast] = useState(null);
@@ -42,4 +43,5 @@ export function ToastProvider({ children }) {
   );
 }
 
+// Optionally export a hook directly (but we already have useToast.js)
 export const useToast = () => useContext(ToastContext);
