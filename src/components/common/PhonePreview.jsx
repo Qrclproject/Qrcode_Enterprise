@@ -8,6 +8,7 @@ export default function PhonePreview({
   buttonType,
   buttonText,
   buttonValue,
+  quickReplies = [],          // 👈 new prop
 }) {
   const imageToShow = headerImageUrl || (showQR ? qrUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=Sample' : null);
 
@@ -45,6 +46,22 @@ export default function PhonePreview({
     );
   };
 
+  const renderQuickReplies = () => {
+    if (!quickReplies || quickReplies.length === 0) return null;
+    return (
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        {quickReplies.map((reply, idx) => (
+          <span
+            key={idx}
+            className="inline-block bg-white border border-gray-300 text-gray-700 text-xs font-medium px-3 py-1 rounded-full"
+          >
+            {reply}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="phone-frame flex flex-col">
       <div className="phone-notch-bar"></div>
@@ -62,7 +79,6 @@ export default function PhonePreview({
         </div>
       </div>
 
-      {/* ─── Scrollable message area ───────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-2 py-1.5">
         <div className="wa-bubble-out">
           {imageToShow && (
@@ -86,6 +102,7 @@ export default function PhonePreview({
           />
 
           {renderButton()}
+          {renderQuickReplies()}   {/* 👈 quick reply buttons */}
 
           <div className="text-right text-[9px] text-gray-400 mt-1.5">
             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{' '}
@@ -94,7 +111,6 @@ export default function PhonePreview({
         </div>
       </div>
 
-      {/* ─── Bottom input bar ───────────────────────────────────── */}
       <div className="flex-shrink-0 bg-gradient-to-b from-[#f0f0f0] to-[#e5e5e5] p-1.5 flex items-center gap-1.5 border-t border-gray-200">
         <i className="far fa-smile text-gray-400 text-sm pl-1"></i>
         <div className="bg-white rounded-full flex-1 h-7 px-2 flex items-center text-[10px] text-gray-400 shadow-inner">

@@ -22,11 +22,12 @@ import { getTemplates } from '../services/templateService';
 import { getDesigns } from '../services/designService';
 import { normalizePhone } from '../utils/formatters';
 
-// ─── Static fallback templates (unchanged) ─────────────────────
+// ─── Static fallback templates (with quickReplies added) ────────
 const staticFallback = [
   {
     id: 'tpl1', name: 'Entry Pass Delivery', showQR: true,
     buttonType: 'none', buttonText: '', buttonValue: '',
+    quickReplies: [],
     variants: [
       { label: 'Friendly', body: 'Hi {{1}} 👋\n\nYour QR code for {{2}} is ready!\n\nDate: {{3}}. Just show this at the door and you\'re in!\n\nSee you there!', active: true },
       { label: 'Formal', body: 'Dear {{1}},\n\nPlease find your official entry pass for {{2}} on {{3}}.\n\nPresent the QR code below at the entrance. We look forward to welcoming you.', active: true },
@@ -36,6 +37,7 @@ const staticFallback = [
   {
     id: 'tpl2', name: 'Event Day Reminder', showQR: true,
     buttonType: 'none', buttonText: '', buttonValue: '',
+    quickReplies: [],
     variants: [
       { label: 'Enthusiastic', body: '🎉 It\'s almost time, {{1}}!\n\n{{2}} kicks off today at {{4}}.\n📍 Venue: {{5}}\n\nQR code attached – show it at the gate!', active: true },
       { label: 'Calm', body: 'Just a gentle reminder, {{1}} — {{2}} is today at {{4}}.\n\nWe\'re at {{5}}. Your QR pass is attached for easy entry.', active: true },
@@ -45,6 +47,7 @@ const staticFallback = [
   {
     id: 'tpl3', name: 'Post-Event Thanks', showQR: false,
     buttonType: 'none', buttonText: '', buttonValue: '',
+    quickReplies: [],
     variants: [
       { label: 'Warm', body: 'Thank you for joining us at {{2}}, {{1}}! 🎉\n\nWe loved having you. Please share your thoughts: {{6}}\n\nSee you at the next event!', active: true },
       { label: 'Professional', body: 'Dear {{1}},\n\nThank you for attending {{2}}. We value your feedback — please complete our short survey: {{6}}\n\nBest regards, EventPass Team', active: true },
@@ -54,11 +57,12 @@ const staticFallback = [
   {
     id: 'tpl4', name: 'Custom Message', showQR: true,
     buttonType: 'none', buttonText: '', buttonValue: '',
+    quickReplies: [],
     variants: [{ label: 'Custom', body: '', active: true }],
   },
 ];
 
-// ─── Modal Design Preview (unchanged) ──────────────────────────
+// ─── Modal Design Preview ───────────────────────────────────────
 function ModalDesignPreview({ design, isSelected, onSelect }) {
   const [dims, setDims] = useState({
     w: design.naturalWidth || 0,
@@ -125,7 +129,7 @@ function ModalDesignPreview({ design, isSelected, onSelect }) {
   );
 }
 
-// ─── QrConfigFields (unchanged) ────────────────────────────────
+// ─── QrConfigFields ─────────────────────────────────────────────
 function QrConfigFields({ columns, mapping, setMapping, qrDataFields, textOverlayPlaceholders }) {
   const renderDropdown = (key, label) => (
     <div key={key}>
@@ -271,6 +275,7 @@ export default function CampaignBuilderPage() {
             buttonType: t.buttonType || 'none',
             buttonText: t.buttonText || '',
             buttonValue: t.buttonValue || '',
+            quickReplies: t.quickReplies || [],
           };
           const activeIndices = (t.variants || []).map((v, i) => (v.active !== false ? i : -1)).filter(i => i >= 0);
           av[t._id] = activeIndices.length > 0 ? activeIndices : [0];
@@ -1140,6 +1145,7 @@ export default function CampaignBuilderPage() {
           headerImageUrl={includeHeaderImage ? headerImageUrl : ''}
           includeHeaderImage={includeHeaderImage}
           setIncludeHeaderImage={handleIncludeHeaderImageToggle}
+          quickReplies={tplDef?.quickReplies || []}
         />
         <SettingsPanel
           batchSize={batchSize}

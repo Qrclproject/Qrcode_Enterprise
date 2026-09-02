@@ -18,6 +18,7 @@ export default function PreviewPanel({
   headerImageUrl,
   includeHeaderImage,
   setIncludeHeaderImage,
+  quickReplies = [],          // 👈 new prop
 }) {
   return (
     <div className="dashboard-panel p-4 bg-gradient-to-b from-gray-50 to-white">
@@ -64,7 +65,7 @@ export default function PreviewPanel({
         </div>
       </div>
 
-      {/* ─── Toggle for Header Image ───────────────────────────── */}
+      {/* Toggle for Header Image */}
       <div className="flex items-center justify-between mb-3 mt-2">
         <span className="text-[10px] font-semibold text-gray-500 uppercase">
           Include Header Image
@@ -83,6 +84,7 @@ export default function PreviewPanel({
         buttonType={buttonType}
         buttonText={buttonText}
         buttonValue={buttonValue}
+        quickReplies={quickReplies}  
       />
 
       {/* Quick link to view the actual QR/composite image */}

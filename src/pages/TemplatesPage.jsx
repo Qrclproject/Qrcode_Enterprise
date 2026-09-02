@@ -96,6 +96,7 @@ export default function TemplatesPage() {
     buttonType,
     buttonText,
     buttonValue,
+    quickReplies,      // 👈 include quickReplies
   }) => {
     try {
       const data = {
@@ -106,6 +107,7 @@ export default function TemplatesPage() {
         buttonType,
         buttonText,
         buttonValue,
+        quickReplies,   // 👈 save quickReplies
       };
 
       if (selectedTemplate) {
@@ -266,7 +268,7 @@ export default function TemplatesPage() {
               key={tpl._id || tpl.id}
               template={tpl}
               onEdit={() => handleEditVariants(tpl)}
-              onEditProperties={handleEditProperties}  // 👈 new gear icon
+              onEditProperties={handleEditProperties}
               onClone={handleClone}
               onDelete={(id) => setDeleteId(id)}
               selected={selectedIds.has(tpl._id)}
@@ -281,8 +283,9 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      {/* Template Form Modal (metadata + CTA) */}
+      {/* Template Form Modal (metadata + CTA + quick replies) */}
       <TemplateForm
+        key={selectedTemplate?._id || 'new'}   // 👈 force remount on change
         isOpen={showForm}
         onClose={() => { setShowForm(false); setSelectedTemplate(null); }}
         onSave={handleFormSave}
