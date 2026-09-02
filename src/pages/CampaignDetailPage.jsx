@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/layout/Toast';
 import Button from '../components/common/Button';
-import Modal from '../components/common/Modal'; // ✅ Import for recipient details modal
+import Modal from '../components/common/Modal';
+import MessageThread from '../components/campaign/MessageThread'; // 👈 NEW
 import {
   getCampaignById,
   retryFailedMessages,
@@ -33,19 +34,17 @@ function StatBadge({ label, value, color = 'gray', icon, subtitle }) {
   );
 }
 
-// ─── Recipient Details Modal ────────────────────────────────────
+// ─── Recipient Details Modal (unchanged) ─────────────────────────
 function RecipientDetailModal({ recipient, onClose }) {
   if (!recipient) return null;
 
-  // Display all fields from the recipient object
   const fields = Object.entries(recipient).filter(
-    ([key]) => !['_id', 'qrUrl'].includes(key) // hide internal id and qr url (shown separately)
+    ([key]) => !['_id', 'qrUrl'].includes(key)
   );
 
   return (
     <Modal isOpen={!!recipient} onClose={onClose} title="Recipient Details" size="max-w-md">
       <div className="space-y-4">
-        {/* QR code image */}
         {recipient.qrUrl && (
           <div className="flex justify-center">
             <img
@@ -90,9 +89,12 @@ export default function CampaignDetailPage() {
   const [retrying, setRetrying] = useState(false);
   const [resettingId, setResettingId] = useState(null);
 
-  // ─── Manual send state (dropdown selection) ─────────────────
+  // ─── Manual send state ───────────────────────────────────────
   const [selectedRecipientId, setSelectedRecipientId] = useState('');
-  const [detailRecipient, setDetailRecipient] = useState(null); // for modal
+  const [detailRecipient, setDetailRecipient] = useState(null);
+
+  // ─── New state for message thread modal ─────────────────────
+  const [messageRecipient, setMessageRecipient] = useState(null);
 
   const fetchCampaign = useCallback(async () => {
     try {
@@ -154,7 +156,6 @@ export default function CampaignDetailPage() {
     }
   };
 
-  // ✅ Open WhatsApp with pre‑filled message and image URL if available
   const openWhatsAppForRecipient = (phone, recipientData = null) => {
     const normalizedPhone = normalizePhone(phone).replace(/^\+/, '');
 
@@ -189,7 +190,6 @@ export default function CampaignDetailPage() {
     window.open(waLink, '_blank');
   };
 
-  // ✅ Updated manual send handler – uses selected recipient from dropdown
   const handleOpenWhatsAppManual = () => {
     if (!selectedRecipientId) {
       showToast('warning', 'No recipient selected', 'Please choose a recipient from the dropdown.');
@@ -203,7 +203,6 @@ export default function CampaignDetailPage() {
     }
   };
 
-  // ✅ Export CSV remains unchanged
   const exportCSV = () => {
     if (!campaign?.recipients?.length) {
       showToast('warning', 'No data', 'No recipients to export.');
@@ -244,7 +243,6 @@ export default function CampaignDetailPage() {
     );
   }
 
-  // Derived stats
   const recipients = campaign.recipients || [];
   const total = recipients.length;
   const sent = recipients.filter(r => r.status === 'sent').length;
@@ -253,7 +251,6 @@ export default function CampaignDetailPage() {
   const checkedIn = recipients.filter(r => r.checkedIn).length;
   const deliveryRate = total > 0 ? Math.round((sent / total) * 100) : 0;
 
-  // Filter recipients
   let filteredRecipients = recipients;
   if (statusFilter !== 'all') {
     filteredRecipients = filteredRecipients.filter(r => r.status === statusFilter);
@@ -283,7 +280,6 @@ export default function CampaignDetailPage() {
       : <span className="text-xs text-gray-400"><i className="fas fa-circle"></i> Not checked</span>;
   };
 
-  // Selected recipient object for preview in manual send
   const selectedManualRecipient = recipients.find(r => (r._id || r.phone) === selectedRecipientId);
 
   return (
@@ -453,7 +449,6 @@ export default function CampaignDetailPage() {
                     <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">{r.name || '—'}</td>
                     <td className="px-4 py-3">
-                      {/* Clickable phone number */}
                       <button
                         onClick={() => setDetailRecipient(r)}
                         className="font-mono text-xs text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline"
@@ -486,6 +481,15 @@ export default function CampaignDetailPage() {
                           title="Send message via WhatsApp"
                         >
                           <i className="fab fa-whatsapp mr-1"></i> Send
+                        </button>
+
+                        {/* 👇 NEW: View Messages button */}
+                        <button
+                          onClick={() => setMessageRecipient(r)}
+                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-200 transition"
+                          title="View customer responses"
+                        >
+                          <i className="fas fa-comments mr-1"></i> Messages
                         </button>
 
                         {r.checkedIn && (
@@ -558,6 +562,22 @@ export default function CampaignDetailPage() {
           recipient={detailRecipient}
           onClose={() => setDetailRecipient(null)}
         />
+
+        {/* ─── NEW: Message Thread Modal ─────────────────────── */}
+        <Modal
+          isOpen={!!messageRecipient}
+          onClose={() => setMessageRecipient(null)}
+          title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient?.phone || ''})`}
+          size="max-w-2xl"
+        >
+          {messageRecipient && (
+            <MessageThread
+              campaignId={campaignId}
+              recipientId={messageRecipient._id || messageRecipient.phone}
+              showHeader={false}
+            />
+          )}
+        </Modal>
       </div>
     </div>
   );
