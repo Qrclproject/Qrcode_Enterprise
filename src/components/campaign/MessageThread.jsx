@@ -1,33 +1,31 @@
 import { useState, useEffect } from 'react';
-import { getCampaignMessages } from '../../services/campaignService';
+import { getCampaignMessages, sendTextMessage } from '../../services/campaignService'; // 👈 added sendTextMessage
 import { useToast } from '../../hooks/useToast';
 
 export default function MessageThread({ campaignId, phone, showHeader = true }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
   const toast = useToast();
+
+  const fetchMessages = async () => {
+    try {
+      setLoading(true);
+      const data = await getCampaignMessages(campaignId, phone);
+      setMessages(data.data || data);
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Failed to load messages');
+      toast?.error?.(err.message || 'Could not fetch messages');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
-    const fetchMessages = async () => {
-      try {
-        setLoading(true);
-        const data = await getCampaignMessages(campaignId, phone);
-        if (isMounted) {
-          setMessages(data.data || data);
-          setError(null);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err.message || 'Failed to load messages');
-          toast?.error?.(err.message || 'Could not fetch messages');
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
     fetchMessages();
     const interval = setInterval(fetchMessages, 10000);
     return () => {
@@ -35,6 +33,21 @@ export default function MessageThread({ campaignId, phone, showHeader = true }) 
       clearInterval(interval);
     };
   }, [campaignId, phone]);
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || sending) return;
+    setSending(true);
+    try {
+      await sendTextMessage(phone, newMessage.trim());
+      setNewMessage('');
+      await fetchMessages(); // refresh list immediately
+    } catch (err) {
+      toast?.error?.(err.message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
 
   if (loading && messages.length === 0) {
     return <div className="p-4 text-center text-gray-400 text-sm">Loading messages…</div>;
@@ -59,7 +72,7 @@ export default function MessageThread({ campaignId, phone, showHeader = true }) 
           No messages yet. Customer replies will appear here.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
           {messages.map((msg) => (
             <div
               key={msg._id || msg.whatsappMessageId}
@@ -88,6 +101,24 @@ export default function MessageThread({ campaignId, phone, showHeader = true }) 
           ))}
         </div>
       )}
+
+      {/* Reply input form */}
+      <form onSubmit={handleSend} className="mt-4 flex gap-2">
+        <input
+          type="text"
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          placeholder="Type a reply..."
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-orange-500 outline-none"
+        />
+        <button
+          type="submit"
+          disabled={sending || !newMessage.trim()}
+          className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 hover:bg-orange-600 transition"
+        >
+          {sending ? 'Sending...' : 'Send'}
+        </button>
+      </form>
     </div>
   );
 }

@@ -63,6 +63,8 @@ export const addRecipientsToCampaign = (campaignId, recipients, options = {}) =>
     generateQr: options.generateQr || false,
     sendNow: options.sendNow || false,
   });
+  export const sendTextMessage = (phone, text) =>
+  api.post('/whatsapp/send-text', { phone, text });
 export const getCampaignMessages = (campaignId, phone, recipientId) => {
   const params = {};
   if (phone) params.phone = phone;
