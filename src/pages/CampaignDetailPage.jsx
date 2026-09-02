@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/layout/Toast';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
-import MessageThread from '../components/campaign/MessageThread'; // 👈 NEW
+import MessageThread from '../components/campaign/MessageThread';
 import {
   getCampaignById,
   retryFailedMessages,
@@ -34,7 +34,7 @@ function StatBadge({ label, value, color = 'gray', icon, subtitle }) {
   );
 }
 
-// ─── Recipient Details Modal (unchanged) ─────────────────────────
+// ─── Recipient Details Modal ────────────────────────────────────
 function RecipientDetailModal({ recipient, onClose }) {
   if (!recipient) return null;
 
@@ -93,7 +93,7 @@ export default function CampaignDetailPage() {
   const [selectedRecipientId, setSelectedRecipientId] = useState('');
   const [detailRecipient, setDetailRecipient] = useState(null);
 
-  // ─── New state for message thread modal ─────────────────────
+  // ─── State for message thread modal ─────────────────────────
   const [messageRecipient, setMessageRecipient] = useState(null);
 
   const fetchCampaign = useCallback(async () => {
@@ -333,7 +333,7 @@ export default function CampaignDetailPage() {
               <option value="">-- Select Recipient --</option>
               {recipients.map(r => (
                 <option key={r._id || r.phone} value={r._id || r.phone}>
-                  {r.name || 'Unknown'} ({r.phone})
+                  {r.name || 'Unknown'} ({normalizePhone(r.phone)})
                 </option>
               ))}
             </select>
@@ -350,7 +350,7 @@ export default function CampaignDetailPage() {
                 <span className="text-gray-500">Attendee Name:</span>
                 <span className="font-medium">{selectedManualRecipient.name || '—'}</span>
                 <span className="text-gray-500">Phone:</span>
-                <span className="font-medium">{selectedManualRecipient.phone}</span>
+                <span className="font-medium">{normalizePhone(selectedManualRecipient.phone)}</span>
                 <span className="text-gray-500">Status:</span>
                 <span>{statusBadge(selectedManualRecipient.status)}</span>
                 <span className="text-gray-500">Check‑In:</span>
@@ -454,7 +454,7 @@ export default function CampaignDetailPage() {
                         className="font-mono text-xs text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline"
                         title="View details"
                       >
-                        {r.phone}
+                        {normalizePhone(r.phone)}
                       </button>
                     </td>
                     <td className="px-4 py-3">{statusBadge(r.status)}</td>
@@ -483,7 +483,7 @@ export default function CampaignDetailPage() {
                           <i className="fab fa-whatsapp mr-1"></i> Send
                         </button>
 
-                        {/* 👇 NEW: View Messages button */}
+                        {/* View Messages button */}
                         <button
                           onClick={() => setMessageRecipient(r)}
                           className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-200 transition"
@@ -539,7 +539,7 @@ export default function CampaignDetailPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-700">
-                      {r.name || 'Unknown'} <span className="text-gray-400">({r.phone})</span>
+                      {r.name || 'Unknown'} <span className="text-gray-400">({normalizePhone(r.phone)})</span>
                     </p>
                     <p className="text-xs text-red-600 mt-0.5">
                       Reason: {r.failureReason || 'Unknown error'}
@@ -563,17 +563,17 @@ export default function CampaignDetailPage() {
           onClose={() => setDetailRecipient(null)}
         />
 
-        {/* ─── NEW: Message Thread Modal ─────────────────────── */}
+        {/* Message Thread Modal */}
         <Modal
           isOpen={!!messageRecipient}
           onClose={() => setMessageRecipient(null)}
-          title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient?.phone || ''})`}
+          title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient ? normalizePhone(messageRecipient.phone) : ''})`}
           size="max-w-2xl"
         >
           {messageRecipient && (
             <MessageThread
               campaignId={campaignId}
-              recipientId={messageRecipient._id || messageRecipient.phone}
+              recipientId={messageRecipient._id}
               showHeader={false}
             />
           )}
