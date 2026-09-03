@@ -75,6 +75,10 @@ export const sendManualMessage = (campaignId, phone, variables = {}) =>
 export const sendTextMessage = (phone, text) =>
   api.post('/whatsapp/send-text', { phone, text });
 
+// Send image message (reply)
+export const sendImageMessage = (phone, imageUrl, caption = '') =>
+  api.post('/whatsapp/send-image', { phone, imageUrl, caption });
+
 // ─── Fetch messages with optional filters ─────────────────────
 // Usage:
 //   getCampaignMessages(campaignId)                       // all

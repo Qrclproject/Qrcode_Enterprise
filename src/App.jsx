@@ -26,7 +26,7 @@ import ScanHistoryPage from './pages/ScanHistoryPage';
 import AddRecipientsPage from './pages/AddRecipientsPage';
 import ExcelTestPage from './pages/ExcelTestPage';
 import MediaLibraryPage from './pages/MediaLibraryPage';
-import MessageLogsPage from './pages/MessageLogsPage';   // 👈 NEW import
+import MessageLogsPage from './pages/MessageLogsPage';
 
 export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -44,7 +44,7 @@ export default function App() {
             <Route path="/data-deletion" element={<DataDeletionPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
 
-            {/* Protected routes with layout */}
+            {/* Protected routes */}
             <Route
               path="/*"
               element={
@@ -80,7 +80,7 @@ export default function App() {
                           <Route path="/check-in/:campaignId" element={<CheckInPage />} />
                           <Route path="/campaigns/:campaignId" element={<CampaignDetailPage />} />
                           <Route path="/campaigns/:campaignId/scan-history" element={<ScanHistoryPage />} />
-                          <Route path="/campaigns/:campaignId/logs" element={<MessageLogsPage />} /> {/* 👈 NEW route */}
+                          <Route path="/campaigns/:campaignId/logs" element={<MessageLogsPage />} />
                           <Route path="/spreadsheet-editor" element={<SpreadsheetEditorPage />} />
                           <Route path="/templates/:templateId/variants/:variantIndex" element={<VariantEditPage />} />
                           <Route path="/no-access" element={<NoAccessPage />} />

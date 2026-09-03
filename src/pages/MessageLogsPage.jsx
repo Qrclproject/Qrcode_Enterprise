@@ -34,7 +34,7 @@ export default function MessageLogsPage() {
     fetchLogs();
     let interval;
     if (autoRefresh) {
-      interval = setInterval(fetchLogs, 10000); // refresh every 10 seconds
+      interval = setInterval(fetchLogs, 10000);
     }
     return () => clearInterval(interval);
   }, [fetchLogs, autoRefresh]);
@@ -115,6 +115,7 @@ export default function MessageLogsPage() {
                 <th className="px-4 py-3 text-left">Phone</th>
                 <th className="px-4 py-3 text-left">Direction</th>
                 <th className="px-4 py-3 text-left">Body</th>
+                <th className="px-4 py-3 text-left">Media</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Sent At</th>
                 <th className="px-4 py-3 text-left">Updated At</th>
@@ -123,7 +124,7 @@ export default function MessageLogsPage() {
             </thead>
             <tbody className="divide-y">
               {logs.length === 0 ? (
-                <tr><td colSpan="7" className="px-4 py-6 text-center text-gray-400">No logs found</td></tr>
+                <tr><td colSpan="8" className="px-4 py-6 text-center text-gray-400">No logs found</td></tr>
               ) : (
                 logs.map((log) => (
                   <tr key={log._id} className="hover:bg-gray-50">
@@ -136,6 +137,11 @@ export default function MessageLogsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">{log.body || '—'}</td>
+                    <td className="px-4 py-3">
+                      {log.mediaUrl ? (
+                        <img src={log.mediaUrl} alt="media" className="w-10 h-10 object-cover rounded" />
+                      ) : '—'}
+                    </td>
                     <td className="px-4 py-3">{statusBadge(log.status)}</td>
                     <td className="px-4 py-3 text-xs text-gray-500">
                       {formatTime(log.timestamp)}

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getCampaignMessages, sendTextMessage } from '../../services/campaignService'; // 👈 added sendTextMessage
+import { useState, useEffect, useCallback } from 'react';
+import { getCampaignMessages, sendTextMessage, sendImageMessage } from '../../services/campaignService';
 import { useToast } from '../../hooks/useToast';
 
 export default function MessageThread({ campaignId, phone, showHeader = true }) {
@@ -8,12 +8,14 @@ export default function MessageThread({ campaignId, phone, showHeader = true }) 
   const [error, setError] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
+  const [sendingImage, setSendingImage] = useState(false);
   const toast = useToast();
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getCampaignMessages(campaignId, phone);
+      const data = await getCampaignMessages(campaignId, { phone });
       setMessages(data.data || data);
       setError(null);
     } catch (err) {
@@ -22,7 +24,7 @@ export default function MessageThread({ campaignId, phone, showHeader = true }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [campaignId, phone, toast]);
 
   useEffect(() => {
     let isMounted = true;
@@ -32,20 +34,34 @@ export default function MessageThread({ campaignId, phone, showHeader = true }) 
       isMounted = false;
       clearInterval(interval);
     };
-  }, [campaignId, phone]);
+  }, [fetchMessages]);
 
-  const handleSend = async (e) => {
+  const handleSendText = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || sending) return;
     setSending(true);
     try {
       await sendTextMessage(phone, newMessage.trim());
       setNewMessage('');
-      await fetchMessages(); // refresh list immediately
+      await fetchMessages();
     } catch (err) {
       toast?.error?.(err.message || 'Failed to send message');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSendImage = async () => {
+    if (!imageUrl.trim() || sendingImage) return;
+    setSendingImage(true);
+    try {
+      await sendImageMessage(phone, imageUrl.trim(), '');
+      setImageUrl('');
+      await fetchMessages();
+    } catch (err) {
+      toast?.error?.(err.message || 'Failed to send image');
+    } finally {
+      setSendingImage(false);
     }
   };
 
@@ -102,8 +118,8 @@ export default function MessageThread({ campaignId, phone, showHeader = true }) 
         </div>
       )}
 
-      {/* Reply input form */}
-      <form onSubmit={handleSend} className="mt-4 flex gap-2">
+      {/* Reply input form for text */}
+      <form onSubmit={handleSendText} className="mt-4 flex gap-2">
         <input
           type="text"
           value={newMessage}
@@ -119,6 +135,24 @@ export default function MessageThread({ campaignId, phone, showHeader = true }) 
           {sending ? 'Sending...' : 'Send'}
         </button>
       </form>
+
+      {/* Reply with image */}
+      <div className="mt-2 flex gap-2">
+        <input
+          type="text"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          placeholder="Image URL (public link)"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none"
+        />
+        <button
+          onClick={handleSendImage}
+          disabled={sendingImage || !imageUrl.trim()}
+          className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 hover:bg-blue-600 transition"
+        >
+          {sendingImage ? 'Sending...' : 'Send Image'}
+        </button>
+      </div>
     </div>
   );
 }
