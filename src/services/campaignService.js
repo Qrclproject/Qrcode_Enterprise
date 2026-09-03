@@ -65,6 +65,10 @@ export const addRecipientsToCampaign = (campaignId, recipients, options = {}) =>
   });
   export const sendTextMessage = (phone, text) =>
   api.post('/whatsapp/send-text', { phone, text });
+  export const getCampaignMessages = (campaignId, filters = {}) => {
+  const params = { ...filters };
+  return api.get(`/campaigns/${campaignId}/messages`, { params });
+};
 export const getCampaignMessages = (campaignId, phone, recipientId) => {
   const params = {};
   if (phone) params.phone = phone;
