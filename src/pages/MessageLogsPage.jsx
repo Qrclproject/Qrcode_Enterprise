@@ -14,7 +14,6 @@ export default function MessageLogsPage() {
   const [directionFilter, setDirectionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchPhone, setSearchPhone] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Reply modal state
   const [replyPhone, setReplyPhone] = useState(null);
@@ -39,12 +38,8 @@ export default function MessageLogsPage() {
 
   useEffect(() => {
     fetchLogs();
-    let interval;
-    if (autoRefresh) {
-      interval = setInterval(fetchLogs, 10000);
-    }
-    return () => clearInterval(interval);
-  }, [fetchLogs, autoRefresh]);
+    // No polling / auto-refresh
+  }, [fetchLogs]);
 
   const statusBadge = (status) => {
     const colors = {
@@ -86,15 +81,6 @@ export default function MessageLogsPage() {
           >
             <i className="fas fa-sync-alt mr-1"></i> Refresh
           </button>
-          <label className="flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded"
-            />
-            Auto‑refresh
-          </label>
         </div>
       </div>
 

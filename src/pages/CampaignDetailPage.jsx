@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/layout/Toast';
 import Button from '../components/common/Button';
@@ -13,8 +13,8 @@ import {
 import { getTemplateById } from '../services/templateService';
 import { normalizePhone } from '../utils/formatters';
 
-// ─── Small stat card for summary ─────────────────────────────────
-function StatBadge({ label, value, color = 'gray', icon, subtitle }) {
+// ─── Small stat card (memoized) ─────────────────────────────────
+const StatBadge = memo(({ label, value, color = 'gray', icon, subtitle }) => {
   const colorClasses = {
     green: 'bg-green-50 text-green-700 border-green-200',
     red: 'bg-red-50 text-red-700 border-red-200',
@@ -33,10 +33,10 @@ function StatBadge({ label, value, color = 'gray', icon, subtitle }) {
       </div>
     </div>
   );
-}
+});
 
-// ─── Recipient Details Modal ────────────────────────────────────
-function RecipientDetailModal({ recipient, onClose }) {
+// ─── Recipient Details Modal (memoized) ─────────────────────────
+const RecipientDetailModal = memo(({ recipient, onClose }) => {
   if (!recipient) return null;
 
   const fields = Object.entries(recipient).filter(
@@ -75,7 +75,7 @@ function RecipientDetailModal({ recipient, onClose }) {
       </div>
     </Modal>
   );
-}
+});
 
 export default function CampaignDetailPage() {
   const { campaignId } = useParams();
@@ -97,14 +97,17 @@ export default function CampaignDetailPage() {
   // ─── State for message thread modal ─────────────────────────
   const [messageRecipient, setMessageRecipient] = useState(null);
 
-  // ─── NEW: State for real‑time unread indicators ─────────────
-  const [baselineMessageIds, setBaselineMessageIds] = useState(new Set());
+  // ─── Unread indicators ─────────────────────────────────────
+  const baselineMessageIdsRef = useRef(new Set());
+  const openedThreadPhonesRef = useRef(new Set());
   const [newMessagePhones, setNewMessagePhones] = useState(new Set());
-  const [openedThreadPhones, setOpenedThreadPhones] = useState(new Set());
+
+  const isModalOpen = !!messageRecipient || !!detailRecipient;
 
   // Fetch campaign details
   const fetchCampaign = useCallback(async () => {
     try {
+      setLoading(true);
       const res = await getCampaignById(campaignId);
       const campaignData = res.data || res;
       setCampaign(campaignData);
@@ -125,41 +128,53 @@ export default function CampaignDetailPage() {
     fetchCampaign();
   }, [fetchCampaign]);
 
-  // Poll for new messages
-  const fetchAllMessages = useCallback(async () => {
+  // Poll for new incoming messages (detect unread)
+  const fetchNewMessages = useCallback(async () => {
+    if (document.visibilityState === 'hidden' || isModalOpen) return;
     try {
       const data = await getCampaignMessages(campaignId);
       const messages = data.data || data;
+      const currentIds = new Set(messages.map(m => m._id || m.whatsappMessageId));
 
-      if (baselineMessageIds.size === 0) {
-        setBaselineMessageIds(new Set(messages.map(m => m._id || m.whatsappMessageId)));
-      } else {
-        const newIncomingPhones = new Set();
-        for (const msg of messages) {
-          const msgId = msg._id || msg.whatsappMessageId;
-          if (!baselineMessageIds.has(msgId) && msg.direction === 'incoming') {
-            const phone = msg.phone;
-            if (!openedThreadPhones.has(phone)) {
-              newIncomingPhones.add(phone);
-            }
+      if (baselineMessageIdsRef.current.size === 0) {
+        baselineMessageIdsRef.current = currentIds;
+        return;
+      }
+
+      const newIncomingPhones = new Set();
+      for (const msg of messages) {
+        const msgId = msg._id || msg.whatsappMessageId;
+        if (!baselineMessageIdsRef.current.has(msgId) && msg.direction === 'incoming') {
+          const phone = msg.phone;
+          if (!openedThreadPhonesRef.current.has(phone)) {
+            newIncomingPhones.add(phone);
           }
         }
-        if (newIncomingPhones.size > 0) {
-          setNewMessagePhones(prev => new Set([...prev, ...newIncomingPhones]));
-        }
-        setBaselineMessageIds(new Set(messages.map(m => m._id || m.whatsappMessageId)));
       }
+
+      if (newIncomingPhones.size > 0) {
+        setNewMessagePhones(prev => new Set([...prev, ...newIncomingPhones]));
+      }
+
+      baselineMessageIdsRef.current = currentIds;
     } catch (err) {
-      console.error('Failed to fetch all messages for unread indicators:', err);
+      console.error('Failed to fetch new messages:', err);
     }
-  }, [campaignId, baselineMessageIds, openedThreadPhones]);
+  }, [campaignId, isModalOpen]);
 
   useEffect(() => {
     if (!campaignId) return;
-    fetchAllMessages();
-    const interval = setInterval(fetchAllMessages, 10000);
-    return () => clearInterval(interval);
-  }, [campaignId, fetchAllMessages]);
+    fetchNewMessages();
+    const interval = setInterval(fetchNewMessages, 60000); // 60 seconds
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchNewMessages();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [campaignId, fetchNewMessages]);
 
   const handleOpenMessages = (recipient) => {
     const phone = normalizePhone(recipient.phone);
@@ -169,14 +184,117 @@ export default function CampaignDetailPage() {
       next.delete(phone);
       return next;
     });
-    setOpenedThreadPhones(prev => new Set(prev).add(phone));
+    openedThreadPhonesRef.current.add(phone);
   };
 
-  const handleRetryAll = async () => { /* unchanged */ };
-  const handleResetCheckIn = async (recipient) => { /* unchanged */ };
-  const openWhatsAppForRecipient = (phone, recipientData = null) => { /* unchanged */ };
-  const handleOpenWhatsAppManual = () => { /* unchanged */ };
-  const exportCSV = () => { /* unchanged */ };
+  const handleRetryAll = async () => {
+    const failedCount = campaign?.recipients?.filter(r => r.status === 'failed').length || 0;
+    if (failedCount === 0) {
+      showToast('info', 'Nothing to retry', 'No failed recipients to retry.');
+      return;
+    }
+    if (!window.confirm(`Retry sending to ${failedCount} failed recipient(s)?`)) return;
+    setRetrying(true);
+    try {
+      await retryFailedMessages(campaignId);
+      showToast('success', 'Retry started', 'Resending to failed recipients...');
+      await fetchCampaign();
+    } catch (err) {
+      showToast('error', 'Retry failed', err.message);
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const handleResetCheckIn = async (recipient) => {
+    const identifier = recipient._id || recipient.phone;
+    if (!identifier) {
+      showToast('error', 'Invalid recipient', 'Cannot identify recipient.');
+      return;
+    }
+    if (!window.confirm('Reactivate this QR code? The attendee will be able to scan again.')) return;
+    setResettingId(identifier);
+    try {
+      await resetRecipientCheckIn(campaignId, identifier);
+      showToast('success', 'QR Reactivated', 'This recipient can now check in again.');
+      await fetchCampaign();
+    } catch (err) {
+      showToast('error', 'Reset failed', err.message);
+    } finally {
+      setResettingId(null);
+    }
+  };
+
+  const openWhatsAppForRecipient = (phone, recipientData = null) => {
+    const normalizedPhone = normalizePhone(phone).replace(/^\+/, '');
+
+    let messageBody = '';
+    if (template && template.variants && template.variants.length > 0) {
+      const activeIndex = (campaign.activeVariants && campaign.activeVariants[0]) || 0;
+      const variant = template.variants[activeIndex] || template.variants[0];
+      messageBody = variant.body || '';
+    }
+
+    if (recipientData) {
+      const mapping = campaign.mapping || {};
+      messageBody = messageBody.replace(/\{\{(\d+)\}\}/g, (match, num) => {
+        const columnName = mapping[num] || mapping[String(num)];
+        if (columnName && recipientData[columnName] !== undefined) {
+          return recipientData[columnName] || '';
+        }
+        return match;
+      });
+    }
+
+    let finalMessage = '';
+    const imageUrl = recipientData?.qrUrl || campaign.headerImageUrl || '';
+    if (imageUrl && campaign.includeHeaderImage) {
+      finalMessage = `${imageUrl}\n\n${messageBody}`;
+    } else {
+      finalMessage = messageBody;
+    }
+
+    const encodedMessage = encodeURIComponent(finalMessage);
+    const waLink = `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
+    window.open(waLink, '_blank');
+  };
+
+  const handleOpenWhatsAppManual = () => {
+    if (!selectedRecipientId) {
+      showToast('warning', 'No recipient selected', 'Please choose a recipient from the dropdown.');
+      return;
+    }
+    const recipient = campaign.recipients?.find(
+      r => (r._id || r.phone) === selectedRecipientId
+    );
+    if (recipient) {
+      openWhatsAppForRecipient(recipient.phone, recipient);
+    }
+  };
+
+  const exportCSV = () => {
+    if (!campaign?.recipients?.length) {
+      showToast('warning', 'No data', 'No recipients to export.');
+      return;
+    }
+    const headers = ['Attendee Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
+    const rows = campaign.recipients.map(r => [
+      r.name || '',
+      r.phone || '',
+      r.status || '',
+      r.checkedIn ? 'Yes' : 'No',
+      r.qrUrl || ''
+    ]);
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${campaign.name || 'campaign'}_recipients.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
 
   if (loading) {
     return (
@@ -216,8 +334,20 @@ export default function CampaignDetailPage() {
 
   const failedRecipients = recipients.filter(r => r.status === 'failed');
 
-  const statusBadge = (status) => { /* unchanged */ };
-  const checkInBadge = (checkedIn) => { /* unchanged */ };
+  const statusBadge = (status) => {
+    const colors = {
+      sent: 'bg-green-100 text-green-700',
+      failed: 'bg-red-100 text-red-700',
+      pending: 'bg-yellow-100 text-yellow-700',
+    };
+    return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${colors[status] || 'bg-gray-100 text-gray-500'}`}>{status}</span>;
+  };
+
+  const checkInBadge = (checkedIn) => {
+    return checkedIn
+      ? <span className="text-xs text-green-600"><i className="fas fa-check-circle"></i> Checked In</span>
+      : <span className="text-xs text-gray-400"><i className="fas fa-circle"></i> Not checked</span>;
+  };
 
   const selectedManualRecipient = recipients.find(r => (r._id || r.phone) === selectedRecipientId);
 
@@ -248,7 +378,6 @@ export default function CampaignDetailPage() {
             <Button variant="outline" onClick={exportCSV} icon="download">
               Export CSV
             </Button>
-            {/* 👇 NEW: View Logs button */}
             <Button
               variant="outline"
               icon="list"
@@ -259,6 +388,13 @@ export default function CampaignDetailPage() {
             <Button variant="primary" onClick={() => navigate(`/check-in/${campaignId}`)} icon="qrcode">
               Check-In
             </Button>
+            <button
+              onClick={fetchCampaign}
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
+              title="Refresh"
+            >
+              <i className="fas fa-sync-alt"></i>
+            </button>
             <button
               onClick={() => navigate(-1)}
               className="text-sm text-gray-500 hover:text-gray-700"
@@ -289,7 +425,6 @@ export default function CampaignDetailPage() {
             </Button>
           </div>
 
-          {/* Preview of selected recipient details */}
           {selectedManualRecipient && (
             <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
               <p className="text-xs font-semibold text-gray-500 mb-2">Selected Recipient Details:</p>
@@ -509,7 +644,7 @@ export default function CampaignDetailPage() {
         )}
 
         {/* Recipient Detail Modal */}
-       <RecipientDetailModal
+        <RecipientDetailModal
           recipient={detailRecipient}
           onClose={() => setDetailRecipient(null)}
         />
