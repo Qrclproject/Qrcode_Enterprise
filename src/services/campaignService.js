@@ -26,7 +26,6 @@ export const uploadCampaignHeader = (file) => {
 };
 
 // Update campaign header image or includeHeaderImage flag
-// Accepts an object: { headerImageUrl?: string, includeHeaderImage?: boolean }
 export const updateCampaignHeaderImage = (campaignId, updates) =>
   api.put(`/campaigns/${campaignId}/header-image`, updates);
 
@@ -49,32 +48,50 @@ export const getCampaignQRProgress = (campaignId) =>
 // Delete a single campaign
 export const deleteCampaign = (id) =>
   api.delete(`/campaigns/${id}`);
-export const renameCampaign = (campaignId, name) => api.put(`/campaigns/${campaignId}/rename`, { name });
+
+export const renameCampaign = (campaignId, name) =>
+  api.put(`/campaigns/${campaignId}/rename`, { name });
+
 // Delete ALL campaigns for the current user (clears history)
 export const deleteAllCampaigns = () =>
   api.delete('/campaigns');
+
 export const getAddRecipientsProgress = (campaignId) =>
   api.get(`/campaigns/${campaignId}/add-recipients-progress`);
-// ✅ NEW: Add recipients to an existing campaign
-// options: { generateQr?: boolean, sendNow?: boolean }
+
+// Add recipients to an existing campaign
 export const addRecipientsToCampaign = (campaignId, recipients, options = {}) =>
   api.post(`/campaigns/${campaignId}/recipients`, {
     recipients,
     generateQr: options.generateQr || false,
     sendNow: options.sendNow || false,
   });
-  export const sendTextMessage = (phone, text) =>
-  api.post('/whatsapp/send-text', { phone, text });
-  export const getCampaignMessages = (campaignId, filters = {}) => {
-  const params = { ...filters };
-  return api.get(`/campaigns/${campaignId}/messages`, { params });
-};
-export const getCampaignMessages = (campaignId, phone, recipientId) => {
-  const params = {};
-  if (phone) params.phone = phone;
-  else if (recipientId) params.recipientId = recipientId;
-  return api.get(`/campaigns/${campaignId}/messages`, { params });
-};
+
 // Send manual WhatsApp message to a specific number
 export const sendManualMessage = (campaignId, phone, variables = {}) =>
   api.post(`/campaigns/${campaignId}/send-manual`, { phone, variables });
+
+// Send free-form text message (reply)
+export const sendTextMessage = (phone, text) =>
+  api.post('/whatsapp/send-text', { phone, text });
+
+// ─── Fetch messages with optional filters ─────────────────────
+// Usage:
+//   getCampaignMessages(campaignId)                       // all
+//   getCampaignMessages(campaignId, { phone: '123', status: 'failed' })
+//   getCampaignMessages(campaignId, '1234567890')         // legacy phone only
+//   getCampaignMessages(campaignId, '1234567890', 'recipientId')
+export const getCampaignMessages = (campaignId, phoneOrFilters, recipientId) => {
+  let params = {};
+
+  if (typeof phoneOrFilters === 'object' && phoneOrFilters !== null) {
+    // New style: filters object
+    params = { ...phoneOrFilters };
+  } else {
+    // Legacy style: phone and optional recipientId
+    if (phoneOrFilters) params.phone = phoneOrFilters;
+    if (recipientId) params.recipientId = recipientId;
+  }
+
+  return api.get(`/campaigns/${campaignId}/messages`, { params });
+};
