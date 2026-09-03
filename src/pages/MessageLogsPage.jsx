@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getCampaignMessages } from '../services/campaignService';
 import { useToast } from '../components/layout/Toast';
+import Modal from '../components/common/Modal';
+import MessageThread from '../components/campaign/MessageThread';
 
 export default function MessageLogsPage() {
   const { campaignId } = useParams();
+  const navigate = useNavigate();
   const showToast = useToast();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,6 +15,10 @@ export default function MessageLogsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchPhone, setSearchPhone] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // Reply modal state
+  const [replyPhone, setReplyPhone] = useState(null);
+  const [showReplyModal, setShowReplyModal] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -50,11 +57,28 @@ export default function MessageLogsPage() {
 
   const formatTime = (dateStr) => new Date(dateStr).toLocaleString();
 
+  const openReplyModal = (phone) => {
+    setReplyPhone(phone);
+    setShowReplyModal(true);
+  };
+
+  const closeReplyModal = () => {
+    setShowReplyModal(false);
+    setReplyPhone(null);
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex flex-wrap justify-between items-center mb-4">
+      <div className="flex items-center mb-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="mr-3 p-2 rounded-full hover:bg-gray-100"
+          title="Go back"
+        >
+          <i className="fas fa-arrow-left text-lg"></i>
+        </button>
         <h1 className="text-2xl font-bold">Message Logs</h1>
-        <div className="flex gap-2">
+        <div className="ml-auto flex gap-2">
           <button
             onClick={fetchLogs}
             className="px-3 py-1.5 border rounded-lg text-xs hover:bg-gray-50"
@@ -120,11 +144,12 @@ export default function MessageLogsPage() {
                 <th className="px-4 py-3 text-left">Sent At</th>
                 <th className="px-4 py-3 text-left">Updated At</th>
                 <th className="px-4 py-3 text-left">Failure Reason</th>
+                <th className="px-4 py-3 text-left">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {logs.length === 0 ? (
-                <tr><td colSpan="8" className="px-4 py-6 text-center text-gray-400">No logs found</td></tr>
+                <tr><td colSpan="9" className="px-4 py-6 text-center text-gray-400">No logs found</td></tr>
               ) : (
                 logs.map((log) => (
                   <tr key={log._id} className="hover:bg-gray-50">
@@ -157,6 +182,16 @@ export default function MessageLogsPage() {
                     <td className="px-4 py-3 text-xs text-red-600">
                       {log.failureReason || '—'}
                     </td>
+                    <td className="px-4 py-3">
+                      {log.direction === 'incoming' && (
+                        <button
+                          onClick={() => openReplyModal(log.phone)}
+                          className="text-blue-600 hover:underline text-xs"
+                        >
+                          Reply
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -164,6 +199,22 @@ export default function MessageLogsPage() {
           </table>
         </div>
       )}
+
+      {/* Reply Modal */}
+      <Modal
+        isOpen={showReplyModal}
+        onClose={closeReplyModal}
+        title={`Reply to ${replyPhone || ''}`}
+        size="max-w-2xl"
+      >
+        {replyPhone && (
+          <MessageThread
+            campaignId={campaignId}
+            phone={replyPhone}
+            showHeader={false}
+          />
+        )}
+      </Modal>
     </div>
   );
 }
