@@ -5,6 +5,7 @@ import ToggleSwitch from '../components/common/ToggleSwitch';
 import { useToast } from '../components/layout/Toast';
 import { getSettings, updateSettings } from '../services/settingsService';
 import { getAgents, createAgent, updateAgent, deleteAgent } from '../services/authService';
+import { COUNTRY_OPTIONS, DEFAULT_COUNTRY_CODE } from '../utils/countries';
 import api from '../services/api';
 
 export default function SettingsPage() {
@@ -17,7 +18,17 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState({
     apiCredentials: { phoneNumberId: '', accessToken: '', webhookToken: '' },
     businessProfile: { displayName: '', description: '', logoUrl: '' },
-    messageDefaults: { language: 'en', senderName: '', autoAttachQr: true, readReceipts: true, deliveryDelay: 0, retryAttempts: 3 },
+    messageDefaults: {
+      language: 'en',
+      senderName: '',
+      autoAttachQr: true,
+      readReceipts: true,
+      deliveryDelay: 0,
+      retryAttempts: 3,
+      // ✅ Phone-number normalization defaults
+      autoAddCountryCode: true,
+      defaultCountryCode: DEFAULT_COUNTRY_CODE,
+    },
     notificationPrefs: { campaignCompleted: true, deliveryFailures: true, weeklySummary: false, email: '' },
     passcode: '',
   });
@@ -346,6 +357,59 @@ export default function SettingsPage() {
               <label className="text-xs font-semibold text-gray-500">Retry Attempts</label>
               <input type="number" value={settings.messageDefaults.retryAttempts} onChange={(e) => updateNested('messageDefaults', 'retryAttempts', Number(e.target.value))} className="w-24 mt-1 border border-gray-200 rounded-lg p-2 text-sm" />
             </div>
+
+            {/* ✅ NEW: Phone Number Normalization */}
+            <div className="border-t pt-4 mt-2 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <i className="fas fa-phone text-orange-500"></i>
+                Phone Number Normalization
+              </h3>
+              <p className="text-[11px] text-gray-500">
+                Controls how phone numbers are stored when a new campaign is created.
+                Campaigns can override these defaults individually.
+              </p>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs">Auto-add country code</span>
+                <ToggleSwitch
+                  checked={settings.messageDefaults.autoAddCountryCode}
+                  onChange={(checked) => updateNested('messageDefaults', 'autoAddCountryCode', checked)}
+                />
+              </div>
+
+              {settings.messageDefaults.autoAddCountryCode && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Default Country</label>
+                  <select
+                    value={settings.messageDefaults.defaultCountryCode || DEFAULT_COUNTRY_CODE}
+                    onChange={(e) => updateNested('messageDefaults', 'defaultCountryCode', e.target.value)}
+                    className="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                  >
+                    {COUNTRY_OPTIONS.map((o) => (
+                      <option key={o.code} value={o.code}>
+                        {o.flag} {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Numbers starting with <code className="bg-gray-100 px-1 rounded">0</code> will have the
+                    leading zero replaced with{' '}
+                    <code className="bg-gray-100 px-1 rounded">
+                      {settings.messageDefaults.defaultCountryCode || DEFAULT_COUNTRY_CODE}
+                    </code>
+                    . Numbers already in international format are left alone.
+                  </p>
+                </div>
+              )}
+
+              {!settings.messageDefaults.autoAddCountryCode && (
+                <p className="text-[10px] text-amber-600 leading-relaxed">
+                  ⚠️ Numbers are stored exactly as uploaded (only separators are stripped).
+                  Make sure your spreadsheets already include a country code.
+                </p>
+              )}
+            </div>
+
             <Button onClick={() => handleSave('Defaults')} icon="save" disabled={saving}>{saving ? 'Saving…' : 'Save Defaults'}</Button>
           </div>
         )}
