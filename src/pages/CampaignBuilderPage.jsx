@@ -21,7 +21,11 @@ import {
 import { getTemplates } from '../services/templateService';
 import { getDesigns } from '../services/designService';
 import { getSettings } from '../services/settingsService';
-import { COUNTRY_OPTIONS, DEFAULT_COUNTRY_CODE } from '../utils/countries';
+import { DEFAULT_COUNTRY_CODE } from '../utils/countries';
+
+// ─── Version marker — grep the console for this to prove the new
+//     bundle is loaded. If you don't see it, the build is stale. ───
+console.log('[CampaignBuilderPage v4] No client-side normalizePhone — server handles it');
 
 // ─── Static fallback templates (with quickReplies added) ────────
 const staticFallback = [
@@ -93,17 +97,17 @@ function ModalDesignPreview({ design, isSelected, onSelect }) {
     <div
       onClick={() => onSelect(design._id)}
       className={`group relative flex flex-col justify-between border rounded-xl p-2 cursor-pointer transition-all duration-200 ${
-        isSelected 
-          ? 'border-orange-500 bg-orange-50/40 ring-2 ring-orange-500/20' 
+        isSelected
+          ? 'border-orange-500 bg-orange-50/40 ring-2 ring-orange-500/20'
           : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
       }`}
     >
       <div className="w-full aspect-[4/3] rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center border border-gray-100 p-1">
         <div className="relative inline-flex max-w-full max-h-full items-center justify-center">
-          <img 
-            src={design.imageUrl} 
-            alt={design.name} 
-            className="max-w-full max-h-full object-contain select-none rounded-[4px]" 
+          <img
+            src={design.imageUrl}
+            alt={design.name}
+            className="max-w-full max-h-full object-contain select-none rounded-[4px]"
             onLoad={handleLoad}
           />
           {hasDims && (
@@ -114,13 +118,13 @@ function ModalDesignPreview({ design, isSelected, onSelect }) {
           )}
         </div>
       </div>
-      
+
       {isSelected && (
         <div className="absolute top-3 right-3 bg-orange-500 text-white w-4 h-4 rounded-full flex items-center justify-center shadow-md z-10">
           <i className="fas fa-check text-[8px]"></i>
         </div>
       )}
-      
+
       <p className={`text-[11px] mt-2 text-center font-medium truncate px-1 ${
         isSelected ? 'text-orange-700 font-bold' : 'text-gray-700'
       }`}>
@@ -181,7 +185,6 @@ export default function CampaignBuilderPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // ─── State ─────────────────────────────────────────────────────
   const [parsedData, setParsedData] = useState(null);
   const [columns, setColumns] = useState([]);
   const [mapping, setMapping] = useState({ phone: '', qr: '', placeholders: {} });
@@ -208,23 +211,20 @@ export default function CampaignBuilderPage() {
   const [qrGenProgress, setQrGenProgress] = useState(0);
   const pollingRef = useRef(null);
 
-  // ✅ Phone number normalization
+  // ✅ Phone number normalization (state only, no client-side logic)
   const [autoAddCountryCode, setAutoAddCountryCode] = useState(true);
   const [defaultCountryCode, setDefaultCountryCode] = useState(DEFAULT_COUNTRY_CODE);
 
-  // ─── Header image state ──────────────────────────────────────
   const [headerImageUrl, setHeaderImageUrl] = useState('');
   const [uploadingHeader, setUploadingHeader] = useState(false);
   const [includeHeaderImage, setIncludeHeaderImage] = useState(false);
 
-  // ─── Name modal state ──────────────────────────────────────────
   const [showNameModal, setShowNameModal] = useState(false);
   const [pendingData, setPendingData] = useState(null);
   const [pendingMapping, setPendingMapping] = useState(null);
 
   const processedRef = useRef('');
 
-  // ─── Design and QR control ────────────────────────────────────
   const [designs, setDesigns] = useState([]);
   const [designId, setDesignId] = useState('');
   const [generateQr, setGenerateQr] = useState(false);
@@ -233,10 +233,8 @@ export default function CampaignBuilderPage() {
 
   const showToast = useToast();
 
-  // ─── Derived readiness flags ───────────────────────────────────
   const isDataUploaded = !!parsedData;
   const isTemplateSelected = !!template;
-  const isCampaignCreated = !!campaignId;
   const isQrProcessing = qrGenStatus === 'processing';
   const isUploadingHeader = uploadingHeader;
   const panelDisabled = !isDataUploaded || !isTemplateSelected;
@@ -248,7 +246,7 @@ export default function CampaignBuilderPage() {
     !isRunning &&
     (includeHeaderImage && generateQr ? !!designId : true);
 
-  // ─── Fetch templates from backend (runs only once on mount) ──
+  // ─── Fetch templates ────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
@@ -305,25 +303,25 @@ export default function CampaignBuilderPage() {
     })();
   }, [showToast]);
 
-  // ─── Fetch designs on mount ──────────────────────────────────
+  // ─── Fetch designs ──────────────────────────────────────────
   useEffect(() => {
     getDesigns()
       .then((res) => setDesigns(res.data?.data || res.data || []))
       .catch(() => {});
   }, []);
 
-  // ─── Fetch user's phone-number defaults from Settings ─────────
+  // ─── Fetch phone defaults from user settings ────────────────
   useEffect(() => {
     getSettings()
       .then((res) => {
         const md = (res?.data || res)?.messageDefaults || {};
         if (md.autoAddCountryCode !== undefined) setAutoAddCountryCode(md.autoAddCountryCode);
         if (md.defaultCountryCode) setDefaultCountryCode(md.defaultCountryCode);
+        console.log('[CampaignBuilderPage v4] loaded user phone defaults →', md.autoAddCountryCode, md.defaultCountryCode);
       })
       .catch(() => {});
   }, []);
 
-  // ─── Derived data ─────────────────────────────────────────────
   const total = parsedData?.length || 0;
   const currentRecipient = parsedData?.[previewRecipientIndex] || {};
   const mappedPhone = mapping.phone ? currentRecipient[mapping.phone] : '';
@@ -336,7 +334,6 @@ export default function CampaignBuilderPage() {
   const designQrDataFields = selectedDesign?.qrDataFields || [];
   const designTextOverlayPlaceholders = (selectedDesign?.textOverlays || []).map(ov => ov.placeholder);
 
-  // ─── Message preview with dynamic placeholders ────────────────
   const getMessageBody = () => {
     let body = '';
     if (template === 'tpl4' || tplDef.name === 'Custom Message') {
@@ -344,7 +341,6 @@ export default function CampaignBuilderPage() {
     } else {
       body = currentVariant?.body || tplDef.variants?.[0]?.body || '';
     }
-
     body = body.replace(/{{(\d+)}}/g, (match, num) => {
       const columnName = mapping.placeholders?.[num];
       if (columnName) {
@@ -353,22 +349,17 @@ export default function CampaignBuilderPage() {
       }
       return match;
     });
-
     body = body.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
     return body;
   };
   const messagePreview = getMessageBody().replace(/\n/g, '<br>');
 
-  // ─── Auto‑mapping helper ──────────────────────────────────────
   const computeMapping = useCallback((cols) => {
     if (!cols || cols.length === 0) return { phone: '', qr: '', placeholders: {} };
-    
     const exact = (preferred) => cols.find(c => c.trim().toLowerCase() === preferred.toLowerCase()) || '';
     const contains = (keywords) => cols.find(c => keywords.every(kw => c.toLowerCase().includes(kw))) || '';
-    
     const phone = exact('phone number') || contains(['phone', 'number']) || contains(['phone']);
     const qr = exact('qr code image url') || contains(['qr', 'image']) || contains(['qr']);
-    
     const placeholders = {};
     const nameCol = exact('attendee name') || exact('full name') || exact('name') || contains(['name']);
     const eventCol = exact('event name') || contains(['event', 'name']) || contains(['event']);
@@ -378,7 +369,6 @@ export default function CampaignBuilderPage() {
     const senderCol = contains(['sender', 'from']);
     const dress1Col = contains(['dress', 'code', '1']);
     const dress2Col = contains(['dress', 'code', '2']);
-    
     if (nameCol) placeholders['1'] = nameCol;
     if (eventCol) placeholders['2'] = eventCol;
     if (dateCol) placeholders['3'] = dateCol;
@@ -387,16 +377,11 @@ export default function CampaignBuilderPage() {
     if (senderCol) placeholders['8'] = senderCol;
     if (dress1Col) placeholders['6'] = dress1Col;
     if (dress2Col) placeholders['7'] = dress2Col;
-    
     return { phone, qr, placeholders };
   }, []);
 
-  // ─── QR polling helpers ───────────────────────────────────────
   const clearPolling = () => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
   };
 
   const startQrPolling = (cid) => {
@@ -407,7 +392,6 @@ export default function CampaignBuilderPage() {
         const data = res.data || res;
         setQrGenTotal(data.total || 0);
         setQrGenProgress(data.completed || 0);
-
         if (data.status === 'completed' || data.status === 'failed') {
           clearPolling();
           setQrGenStatus(data.status);
@@ -416,13 +400,9 @@ export default function CampaignBuilderPage() {
             const updated = await getCampaignById(cid);
             const campaign = updated?.data || updated;
             if (campaign?.recipients) {
-              const flat = campaign.recipients.map(r => {
-                return { ...r, 'Phone Number': r.phone };
-              });
+              const flat = campaign.recipients.map(r => ({ ...r, 'Phone Number': r.phone }));
               setParsedData(flat);
-              if (flat.length > 0) {
-                setColumns(Object.keys(flat[0]));
-              }
+              if (flat.length > 0) setColumns(Object.keys(flat[0]));
             }
           } else {
             showToast('error', 'QR generation failed', 'Some QR codes could not be created.');
@@ -437,21 +417,15 @@ export default function CampaignBuilderPage() {
     pollingRef.current = interval;
   };
 
-  useEffect(() => {
-    return () => clearPolling();
-  }, []);
+  useEffect(() => () => clearPolling(), []);
 
-  // ─── Upload header image handler (now updates backend if campaign exists) ──
   const handleHeaderImageUpload = async (file) => {
     if (!file) {
       setHeaderImageUrl('');
       setIncludeHeaderImage(false);
       if (campaignId) {
         try {
-          await updateCampaignHeaderImage(campaignId, {
-            headerImageUrl: '',
-            includeHeaderImage: false,
-          });
+          await updateCampaignHeaderImage(campaignId, { headerImageUrl: '', includeHeaderImage: false });
           showToast('success', 'Image removed', 'Header image cleared.');
         } catch (err) {
           showToast('error', 'Failed to remove image', err.message);
@@ -459,21 +433,15 @@ export default function CampaignBuilderPage() {
       }
       return;
     }
-
     setUploadingHeader(true);
     try {
       const res = await uploadCampaignHeader(file);
       const url = res.data?.url || res.url;
       setHeaderImageUrl(url);
       setIncludeHeaderImage(true);
-
       if (campaignId) {
-        await updateCampaignHeaderImage(campaignId, {
-          headerImageUrl: url,
-          includeHeaderImage: true,
-        });
+        await updateCampaignHeaderImage(campaignId, { headerImageUrl: url, includeHeaderImage: true });
       }
-
       showToast('success', 'Image uploaded', 'Header image will be used for all recipients.');
     } catch (err) {
       showToast('error', 'Upload failed', err.message);
@@ -482,12 +450,9 @@ export default function CampaignBuilderPage() {
     }
   };
 
-  // ─── Toggle Include Header Image (and update backend if campaign exists) ──
   const handleIncludeHeaderImageToggle = async (checked) => {
     setIncludeHeaderImage(checked);
-    if (!checked) {
-      setHeaderImageUrl('');
-    }
+    if (!checked) setHeaderImageUrl('');
     if (campaignId) {
       try {
         await updateCampaignHeaderImage(campaignId, {
@@ -500,7 +465,10 @@ export default function CampaignBuilderPage() {
     }
   };
 
-  // ─── Process data from spreadsheet editor ─────────────────────
+  // ────────────────────────────────────────────────────────────
+  //   processSpreadsheetData — where the campaign is created
+  //   after the "Save & Continue" flow. NO normalizePhone here.
+  // ────────────────────────────────────────────────────────────
   const processSpreadsheetData = useCallback(async (data, mappingObj, name) => {
     if (!data || data.length === 0) return;
 
@@ -515,10 +483,11 @@ export default function CampaignBuilderPage() {
         Object.entries(row).forEach(([key, value]) => {
           rec[key] = value === null || value === undefined ? '' : String(value);
         });
-        // ✅ Send raw — backend normalizes based on autoAddCountryCode.
+        // ✅ SEND RAW. Backend normalizes using autoAddCountryCode.
         rec.phone = row[mappingObj.phone] || '';
         return rec;
       });
+
       const campaignData = {
         name: name || 'Campaign ' + new Date().toLocaleDateString(),
         templateKey: template,
@@ -537,10 +506,16 @@ export default function CampaignBuilderPage() {
         headerImageUrl: includeHeaderImage ? (headerImageUrl || undefined) : undefined,
         designId: includeHeaderImage && generateQr ? (designId || undefined) : undefined,
         includeHeaderImage,
-        // ✅ New: phone-number normalization
         autoAddCountryCode,
         defaultCountryCode,
       };
+
+      // ✅ Debug log — proves what we send to the backend
+      console.log('[processSpreadsheetData v4] sending payload:', {
+        autoAddCountryCode,
+        defaultCountryCode,
+        firstPhone: recipients[0]?.phone,
+      });
 
       const res = await createCampaign(campaignData);
       const newId = res.data?._id || res.data?.id;
@@ -562,55 +537,27 @@ export default function CampaignBuilderPage() {
       showToast('error', 'Campaign creation failed', err.message);
     }
   }, [
-    template,
-    batchSize,
-    waitValue,
-    waitUnit,
-    activeVariants,
-    templateDefs,
-    designId,
-    generateQr,
-    showToast,
-    startQrPolling,
-    headerImageUrl,
-    includeHeaderImage,
-    autoAddCountryCode,
-    defaultCountryCode,
+    template, batchSize, waitValue, waitUnit, activeVariants, templateDefs,
+    designId, generateQr, showToast, startQrPolling, headerImageUrl,
+    includeHeaderImage, autoAddCountryCode, defaultCountryCode,
   ]);
 
-  // ─── Build restore state for navigation ──────────────────────
   const buildRestoreState = () => ({
-    template,
-    mapping,
-    batchSize,
-    waitValue,
-    waitUnit,
-    activeVariants,
-    customMessage,
-    designId,
-    generateQr,
-    previewVariantIndex,
-    campaignName,
-    headerImageUrl,
-    includeHeaderImage,
-    autoAddCountryCode,
-    defaultCountryCode,
+    template, mapping, batchSize, waitValue, waitUnit, activeVariants,
+    customMessage, designId, generateQr, previewVariantIndex, campaignName,
+    headerImageUrl, includeHeaderImage, autoAddCountryCode, defaultCountryCode,
   });
 
-  // ─── Data loading effect ─────────────────────────────────
   useEffect(() => {
     if (!location.state?.spreadsheetData) return;
-
     const restoreState = location.state?.restoreState;
     const data = location.state.spreadsheetData;
 
-    if (restoreState?.mapping) {
-      setMapping(restoreState.mapping);
-    } else {
+    if (restoreState?.mapping) setMapping(restoreState.mapping);
+    else {
       const cols = Object.keys(data[0] || {});
       setColumns(cols);
-      const newMapping = computeMapping(cols);
-      setMapping(newMapping);
+      setMapping(computeMapping(cols));
     }
 
     setParsedData(data);
@@ -631,18 +578,13 @@ export default function CampaignBuilderPage() {
 
     setPreviewRecipientIndex(0);
     const active = activeVariants[template] || [];
-    if (!active.includes(previewVariantIndex)) {
-      setPreviewVariantIndex(active[0] || 0);
-    }
+    if (!active.includes(previewVariantIndex)) setPreviewVariantIndex(active[0] || 0);
 
     window.history.replaceState({}, document.title);
-
     setPendingData(data);
     setPendingMapping(restoreState?.mapping || computeMapping(Object.keys(data[0] || {})));
-
   }, [location.state?.spreadsheetData, location.state?.restoreState]);
 
-  // ─── Campaign name modal handlers ─────────────────────────────
   const handleNameSubmit = () => {
     if (!campaignName.trim()) {
       showToast('warning', 'Missing name', 'Please provide a campaign name.');
@@ -663,7 +605,6 @@ export default function CampaignBuilderPage() {
     showToast('info', 'Cancelled', 'Campaign creation cancelled.');
   };
 
-  // ─── Load campaign from Sent History ───────────────────────────
   useEffect(() => {
     const c = location.state?.campaignToLoad;
     if (c) {
@@ -683,9 +624,7 @@ export default function CampaignBuilderPage() {
     const qr = mappingData.qr || 'qrUrl';
     const placeholders = {};
     Object.keys(mappingData).forEach(key => {
-      if (key !== 'phone' && key !== 'qr') {
-        placeholders[key] = mappingData[key];
-      }
+      if (key !== 'phone' && key !== 'qr') placeholders[key] = mappingData[key];
     });
     setMapping({ phone, qr, placeholders });
     setTemplate(campaign.templateKey || templateList[0]?.id || 'tpl1');
@@ -700,13 +639,11 @@ export default function CampaignBuilderPage() {
     setGenerateQr(!!campaign.designId);
     setHeaderImageUrl(campaign.headerImageUrl || '');
     setIncludeHeaderImage(!!(campaign.headerImageUrl || campaign.designId));
-    // ✅ Load campaign-level phone settings
     if (campaign.autoAddCountryCode !== undefined) setAutoAddCountryCode(campaign.autoAddCountryCode);
     if (campaign.defaultCountryCode) setDefaultCountryCode(campaign.defaultCountryCode);
     showToast('info', 'Campaign Loaded', `"${campaign.name}" is ready for editing.`);
   };
 
-  // ─── Variant management (unchanged) ────────────────────────
   const toggleVariant = (tplKey, index) => {
     const active = [...(activeVariants[tplKey] || [])];
     const pos = active.indexOf(index);
@@ -737,8 +674,7 @@ export default function CampaignBuilderPage() {
     setPreviewRecipientIndex(newIdx);
     const active = activeVariants[template];
     if (active && active.length > 0 && template !== 'tpl4') {
-      const hash = (newIdx * 7 + 3) % active.length;
-      setPreviewVariantIndex(active[hash]);
+      setPreviewVariantIndex(active[(newIdx * 7 + 3) % active.length]);
     }
   };
 
@@ -748,12 +684,10 @@ export default function CampaignBuilderPage() {
     setPreviewRecipientIndex(newIdx);
     const active = activeVariants[template];
     if (active && active.length > 0 && template !== 'tpl4') {
-      const hash = (newIdx * 7 + 3) % active.length;
-      setPreviewVariantIndex(active[hash]);
+      setPreviewVariantIndex(active[(newIdx * 7 + 3) % active.length]);
     }
   };
 
-  // ✅ Template change resets campaignId to force new campaign creation
   const handleTemplateChange = (newTemplate) => {
     setTemplate(newTemplate);
     const active = activeVariants[newTemplate] || [0];
@@ -768,10 +702,8 @@ export default function CampaignBuilderPage() {
       showToast('error', 'No data', 'Please upload an Excel/CSV file first.');
       return;
     }
-
     let cid = campaignId;
 
-    // If campaign doesn't exist yet, create it now
     if (!cid) {
       if (!campaignName.trim()) {
         const name = prompt('Enter campaign name:', 'Campaign ' + new Date().toLocaleString());
@@ -782,7 +714,7 @@ export default function CampaignBuilderPage() {
       setProgress(5);
       setStatus('Creating campaign...');
       try {
-        const created = await createCampaign({
+        const payload = {
           name: campaignName || 'Campaign ' + new Date().toLocaleString(),
           templateKey: template,
           templateId: template,
@@ -800,10 +732,18 @@ export default function CampaignBuilderPage() {
           headerImageUrl: includeHeaderImage ? (headerImageUrl || undefined) : undefined,
           designId: includeHeaderImage && generateQr ? (designId || undefined) : undefined,
           includeHeaderImage,
-          // ✅ New: phone-number normalization
           autoAddCountryCode,
           defaultCountryCode,
+        };
+
+        // ✅ Debug log — proves what we send
+        console.log('[handleLaunch v4] sending payload:', {
+          autoAddCountryCode,
+          defaultCountryCode,
+          firstPhone: payload.recipients[0]?.phone,
         });
+
+        const created = await createCampaign(payload);
         cid = created.data?._id || created.data?.id;
         setCampaignId(cid);
         setCampaignName(campaignName);
@@ -815,45 +755,30 @@ export default function CampaignBuilderPage() {
       }
     }
 
-    // Launch the campaign
     try {
       setIsRunning(true);
       setProgress(10);
       setStatus('Launching campaign...');
-      console.log('📡 Calling launchCampaign with campaignId:', cid);
       const result = await launchCampaign(cid);
-      console.log('✅ Launch response:', result);
       setIsRunning(false);
       setProgress(100);
       const delivered = result.data?.delivered ?? 0;
       const failed = result.data?.failed ?? 0;
       showToast('success', 'Campaign Launched', `Sent: ${delivered} | Failed: ${failed}`);
     } catch (error) {
-      console.error('❌ Launch failed:', error);
       setIsRunning(false);
       showToast('error', 'Launch Failed', error.response?.data?.message || error.message);
     }
   };
 
   const handleTestSend = (phone) => {
-    if (!phone) {
-      showToast('warning', 'Missing Number', 'Please enter a phone number.');
-      return;
-    }
+    if (!phone) { showToast('warning', 'Missing Number', 'Please enter a phone number.'); return; }
     showToast('success', 'Test Sent', `Message dispatched to ${phone}.`);
   };
 
-  const handleRetryAllFailed = () => {
-    showToast('info', 'Retrying', 'Resending failed messages...');
-    setFailedRecipients([]);
-  };
+  const handleRetryAllFailed = () => { showToast('info', 'Retrying', 'Resending failed messages...'); setFailedRecipients([]); };
+  const handleRetrySingleFailed = (index) => { setFailedRecipients(prev => prev.filter((_, i) => i !== index)); showToast('success', 'Retried', 'Message resent.'); };
 
-  const handleRetrySingleFailed = (index) => {
-    setFailedRecipients(prev => prev.filter((_, i) => i !== index));
-    showToast('success', 'Retried', 'Message resent.');
-  };
-
-  // ─── Reset everything ─────────────────────────────────────────
   const handleReset = () => {
     clearPolling();
     setParsedData(null);
@@ -888,52 +813,35 @@ export default function CampaignBuilderPage() {
     setHeaderImageUrl('');
     setUploadingHeader(false);
     setIncludeHeaderImage(false);
-    // ✅ Reset phone normalization to defaults (user can override per campaign)
     setAutoAddCountryCode(true);
     setDefaultCountryCode(DEFAULT_COUNTRY_CODE);
   };
 
-  // ─── Toggle QR generation (only active if includeHeaderImage) ──
   const handleToggleQR = (checked) => {
     if (!includeHeaderImage) return;
     setGenerateQr(checked);
-    if (checked && !designId && designs.length > 0) {
-      setShowDesignModal(true);
-    } else if (!checked) {
-      setDesignId('');
-      setShowQrConfigModal(false);
-    }
+    if (checked && !designId && designs.length > 0) setShowDesignModal(true);
+    else if (!checked) { setDesignId(''); setShowQrConfigModal(false); }
   };
 
-  // ─── Select design from modal ─────────────────────────────────
   const handleSelectDesign = (selectedId) => {
     setDesignId(selectedId);
     setShowDesignModal(false);
     const design = designs.find(d => d._id === selectedId);
     const hasQrFields = design?.qrDataFields?.length > 0;
     const hasTextOverlays = design?.textOverlays?.length > 0;
-    if (hasQrFields || hasTextOverlays) {
-      setShowQrConfigModal(true);
-    } else {
-      handleQrConfigProceed();
-    }
+    if (hasQrFields || hasTextOverlays) setShowQrConfigModal(true);
+    else handleQrConfigProceed();
   };
 
-  // ─── Proceed after QR config ─────────────────────────────────
   const handleQrConfigProceed = () => {
     setShowQrConfigModal(false);
     if (parsedData && mapping.phone) {
-      if (campaignName) {
-        processSpreadsheetData(parsedData, mapping, campaignName);
-      } else {
-        setPendingData(parsedData);
-        setPendingMapping(mapping);
-        setShowNameModal(true);
-      }
+      if (campaignName) processSpreadsheetData(parsedData, mapping, campaignName);
+      else { setPendingData(parsedData); setPendingMapping(mapping); setShowNameModal(true); }
     }
   };
 
-  // ─── Wait for templates ────────────────────────────────────────
   if (Object.keys(templateDefs).length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -944,7 +852,6 @@ export default function CampaignBuilderPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-5 pb-20 bg-gradient-to-br from-gray-50 to-orange-50/30">
-      
       <div className="mb-5 flex justify-between items-end">
         <div>
           <h1 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
@@ -957,20 +864,13 @@ export default function CampaignBuilderPage() {
             <>
               <button
                 onClick={() => navigate('/spreadsheet-editor', {
-                  state: {
-                    parsedData,
-                    fileName: 'current_sheet',
-                    restoreState: buildRestoreState(),
-                  }
+                  state: { parsedData, fileName: 'current_sheet', restoreState: buildRestoreState() }
                 })}
                 className="text-xs text-blue-600 hover:underline bg-transparent border-none cursor-pointer hover:text-blue-800 transition-colors"
               >
                 <i className="fas fa-edit mr-1"></i> Edit Data
               </button>
-              <button
-                onClick={handleReset}
-                className="text-xs text-red-600 hover:underline bg-transparent border-none cursor-pointer hover:text-red-800 transition-colors"
-              >
+              <button onClick={handleReset} className="text-xs text-red-600 hover:underline bg-transparent border-none cursor-pointer hover:text-red-800 transition-colors">
                 <i className="fas fa-trash-alt mr-1"></i> Remove Sheet
               </button>
             </>
@@ -981,23 +881,14 @@ export default function CampaignBuilderPage() {
         </div>
       </div>
 
-      {total > 0 && (
-        <div className="mt-4">
-          <BatchPreview batchSize={batchSize} total={total} />
-        </div>
-      )}
+      {total > 0 && <div className="mt-4"><BatchPreview batchSize={batchSize} total={total} /></div>}
 
       {failedRecipients.length > 0 && (
         <div className="mt-4">
-          <FailedRecipients
-            failedList={failedRecipients}
-            onRetryAll={handleRetryAllFailed}
-            onRetrySingle={handleRetrySingleFailed}
-          />
+          <FailedRecipients failedList={failedRecipients} onRetryAll={handleRetryAllFailed} onRetrySingle={handleRetrySingleFailed} />
         </div>
       )}
 
-      {/* QR generation progress banners */}
       {qrGenStatus === 'processing' && (
         <div className="mb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 flex items-center gap-3 shadow-sm">
           <i className="fas fa-qrcode text-blue-500 text-lg animate-pulse"></i>
@@ -1007,10 +898,8 @@ export default function CampaignBuilderPage() {
               <span>{qrGenProgress} of {qrGenTotal}</span>
             </div>
             <div className="w-full bg-blue-200 rounded-full h-2">
-              <div
-                className="h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300"
-                style={{ width: `${(qrGenProgress / (qrGenTotal || 1)) * 100}%` }}
-              ></div>
+              <div className="h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300"
+                style={{ width: `${(qrGenProgress / (qrGenTotal || 1)) * 100}%` }}></div>
             </div>
           </div>
         </div>
@@ -1026,16 +915,7 @@ export default function CampaignBuilderPage() {
         </div>
       )}
 
-      {/* ─── DESIGN SELECTION MODAL ─────────────────────────────── */}
-      <Modal
-        isOpen={showDesignModal}
-        onClose={() => {
-          setShowDesignModal(false);
-          if (!designId) setGenerateQr(false);
-        }}
-        title="Choose a Pass Design"
-        size="max-w-md"
-      >
+      <Modal isOpen={showDesignModal} onClose={() => { setShowDesignModal(false); if (!designId) setGenerateQr(false); }} title="Choose a Pass Design" size="max-w-md">
         <div className="flex flex-col h-full space-y-4 pt-1">
           {designs.length === 0 ? (
             <div className="text-center py-8 px-4 border border-dashed border-gray-200 rounded-xl bg-gradient-to-b from-gray-50 to-white flex flex-col items-center justify-center">
@@ -1046,88 +926,45 @@ export default function CampaignBuilderPage() {
               <p className="text-xs text-gray-400 mt-1 mb-4 max-w-[240px]">
                 Create a design layout first to apply your dynamic QR code overlays.
               </p>
-              <button
-                onClick={() => { navigate('/designs'); setShowDesignModal(false); }}
-                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-xs font-semibold shadow-md shadow-orange-200 transition-all"
-              >
+              <button onClick={() => { navigate('/designs'); setShowDesignModal(false); }}
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg text-xs font-semibold shadow-md shadow-orange-200 transition-all">
                 Create a New Design
               </button>
             </div>
           ) : (
             <>
-              <p className="text-xs text-gray-500 -mt-1">
-                Select a template layout below to automatically project your campaign QR code mapping.
-              </p>
+              <p className="text-xs text-gray-500 -mt-1">Select a template layout below to automatically project your campaign QR code mapping.</p>
               <div className="grid grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200">
                 {designs.map((d) => (
-                  <ModalDesignPreview
-                    key={d._id}
-                    design={d}
-                    isSelected={designId === d._id}
-                    onSelect={handleSelectDesign}
-                  />
+                  <ModalDesignPreview key={d._id} design={d} isSelected={designId === d._id} onSelect={handleSelectDesign} />
                 ))}
               </div>
-              <button
-                onClick={() => { navigate('/designs'); setShowDesignModal(false); }}
-                className="w-full py-2 border border-dashed border-gray-300 text-gray-600 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50/20 rounded-lg text-xs font-medium transition-all"
-              >
+              <button onClick={() => { navigate('/designs'); setShowDesignModal(false); }}
+                className="w-full py-2 border border-dashed border-gray-300 text-gray-600 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50/20 rounded-lg text-xs font-medium transition-all">
                 <i className="fas fa-plus mr-1 text-[10px]"></i> Create New Design
               </button>
             </>
           )}
           <div className="flex justify-end pt-2 border-t border-gray-100 gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowDesignModal(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowDesignModal(false)}>Cancel</Button>
           </div>
         </div>
       </Modal>
 
-      {/* ─── QR CONFIG MODAL ─────────────────────────────────────── */}
-      <Modal
-        isOpen={showQrConfigModal}
-        onClose={() => {
-          setShowQrConfigModal(false);
-          setDesignId('');
-          setGenerateQr(false);
-        }}
-        title="Configure QR Code"
-        size="max-w-md"
-      >
+      <Modal isOpen={showQrConfigModal} onClose={() => { setShowQrConfigModal(false); setDesignId(''); setGenerateQr(false); }} title="Configure QR Code" size="max-w-md">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Map the columns for the QR data fields and text overlays defined in the design.
-          </p>
-          <QrConfigFields
-            columns={columns}
-            mapping={mapping}
-            setMapping={setMapping}
-            qrDataFields={designQrDataFields}
-            textOverlayPlaceholders={designTextOverlayPlaceholders}
-          />
+          <p className="text-sm text-gray-600">Map the columns for the QR data fields and text overlays defined in the design.</p>
+          <QrConfigFields columns={columns} mapping={mapping} setMapping={setMapping} qrDataFields={designQrDataFields} textOverlayPlaceholders={designTextOverlayPlaceholders} />
           <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button variant="outline" onClick={() => {
-              setShowQrConfigModal(false);
-              setDesignId('');
-              setGenerateQr(false);
-            }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowQrConfigModal(false); setDesignId(''); setGenerateQr(false); }}>Cancel</Button>
             <Button variant="primary" onClick={handleQrConfigProceed}>Proceed</Button>
           </div>
         </div>
       </Modal>
 
-      {/* ─── CAMPAIGN NAME MODAL ─────────────────────────────────── */}
-      <Modal
-        isOpen={showNameModal}
-        onClose={handleNameCancel}
-        title="Name Your Campaign"
-        size="max-w-md"
-      >
+      <Modal isOpen={showNameModal} onClose={handleNameCancel} title="Name Your Campaign" size="max-w-md">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Give your campaign a meaningful name so you can easily identify it later.
-          </p>
+          <p className="text-sm text-gray-600">Give your campaign a meaningful name so you can easily identify it later.</p>
           <input
             type="text"
             value={campaignName}
@@ -1144,21 +981,14 @@ export default function CampaignBuilderPage() {
         </div>
       </Modal>
 
-      {/* Main Builder panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <UploadPanel onReset={handleReset} />
         <MappingPanel
-          columns={columns}
-          mapping={mapping}
-          setMapping={setMapping}
-          template={template}
-          setTemplate={handleTemplateChange}
-          templates={templateList}
-          templateDefinitions={templateDefs}
-          activeVariants={activeVariants}
-          toggleVariant={toggleVariant}
-          customMessage={customMessage}
-          setCustomMessage={setCustomMessage}
+          columns={columns} mapping={mapping} setMapping={setMapping}
+          template={template} setTemplate={handleTemplateChange}
+          templates={templateList} templateDefinitions={templateDefs}
+          activeVariants={activeVariants} toggleVariant={toggleVariant}
+          customMessage={customMessage} setCustomMessage={setCustomMessage}
           qrDataFields={designQrDataFields}
           textOverlayPlaceholders={designTextOverlayPlaceholders}
           showQrFields={includeHeaderImage && generateQr && !!designId}
@@ -1183,29 +1013,20 @@ export default function CampaignBuilderPage() {
           quickReplies={tplDef?.quickReplies || []}
         />
         <SettingsPanel
-          batchSize={batchSize}
-          setBatchSize={setBatchSize}
-          waitValue={waitValue}
-          setWaitValue={setWaitValue}
-          waitUnit={waitUnit}
-          setWaitUnit={setWaitUnit}
-          scheduleTime={scheduleTime}
-          setScheduleTime={setScheduleTime}
-          onLaunch={handleLaunch}
-          onTestSend={handleTestSend}
-          isRunning={isRunning}
-          progress={progress}
-          status={status}
+          batchSize={batchSize} setBatchSize={setBatchSize}
+          waitValue={waitValue} setWaitValue={setWaitValue}
+          waitUnit={waitUnit} setWaitUnit={setWaitUnit}
+          scheduleTime={scheduleTime} setScheduleTime={setScheduleTime}
+          onLaunch={handleLaunch} onTestSend={handleTestSend}
+          isRunning={isRunning} progress={progress} status={status}
           variantCount={(activeVariants[template] || []).length}
-          generateQr={generateQr}
-          onToggleQR={handleToggleQR}
+          generateQr={generateQr} onToggleQR={handleToggleQR}
           onOpenDesignModal={() => setShowDesignModal(true)}
           selectedDesignName={selectedDesign?.name || 'None'}
           headerImageUrl={headerImageUrl}
           onHeaderImageUpload={handleHeaderImageUpload}
           uploadingHeader={uploadingHeader}
-          panelDisabled={panelDisabled}
-          canLaunch={canLaunch}
+          panelDisabled={panelDisabled} canLaunch={canLaunch}
           headerImageEnabled={includeHeaderImage}
           autoAddCountryCode={autoAddCountryCode}
           setAutoAddCountryCode={setAutoAddCountryCode}
