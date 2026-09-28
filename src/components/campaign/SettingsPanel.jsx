@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import ProgressBar from '../common/ProgressBar';
+import ToggleSwitch from '../common/ToggleSwitch';
+import { COUNTRY_OPTIONS, DEFAULT_COUNTRY_CODE } from '../../utils/countries';
 
 export default function SettingsPanel({
   batchSize, setBatchSize,
@@ -19,6 +21,12 @@ export default function SettingsPanel({
   panelDisabled,
   canLaunch,
   headerImageEnabled,
+
+  // ✅ NEW: phone-number normalization
+  autoAddCountryCode,
+  setAutoAddCountryCode,
+  defaultCountryCode,
+  setDefaultCountryCode,
 }) {
   const [testNumber, setTestNumber] = useState('');
 
@@ -27,6 +35,52 @@ export default function SettingsPanel({
       <div className="panel-header"><div className="panel-badge">4</div> SETTINGS & LAUNCH</div>
 
       <fieldset disabled={panelDisabled} className="space-y-3 flex-1">
+        {/* ─── Phone Number Formatting (NEW) ─────────────────── */}
+        <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-2.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold text-gray-600 uppercase">
+              <i className="fas fa-phone text-blue-500 mr-1"></i>
+              Auto-add Country Code
+            </span>
+            <ToggleSwitch
+              checked={autoAddCountryCode}
+              onChange={setAutoAddCountryCode}
+            />
+          </div>
+
+          {autoAddCountryCode ? (
+            <>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase">
+                  Default Country
+                </label>
+                <select
+                  value={defaultCountryCode || DEFAULT_COUNTRY_CODE}
+                  onChange={(e) => setDefaultCountryCode(e.target.value)}
+                  className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none"
+                >
+                  {COUNTRY_OPTIONS.map((o) => (
+                    <option key={o.code} value={o.code}>
+                      {o.flag} {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-[9px] text-blue-700 leading-relaxed">
+                Local numbers (e.g. <code className="bg-white/60 px-1 rounded">0812…</code>) will
+                be converted to <code className="bg-white/60 px-1 rounded">
+                  {defaultCountryCode || DEFAULT_COUNTRY_CODE}812…
+                </code>
+              </p>
+            </>
+          ) : (
+            <p className="text-[9px] text-amber-700 leading-relaxed">
+              Numbers are stored exactly as submitted (minus separators). Make sure
+              your spreadsheet already includes the country code.
+            </p>
+          )}
+        </div>
+
         {/* Messages Per Batch */}
         <div>
           <label className="text-[10px] font-semibold text-gray-400 uppercase">Messages Per Batch</label>
@@ -60,7 +114,7 @@ export default function SettingsPanel({
             className="w-full bg-white border border-gray-200 text-gray-700 text-xs rounded-lg p-2 mt-0.5 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow" />
         </div>
 
-        {/* ─── Static Header Image ─────────────────────────────── */}
+        {/* Static Header Image */}
         <div className={`border-t pt-3 ${!headerImageEnabled ? 'opacity-60' : ''}`}>
           <label className="text-[10px] font-semibold text-gray-400 uppercase">
             Attach Header Image (optional)
@@ -101,7 +155,7 @@ export default function SettingsPanel({
           )}
         </div>
 
-        {/* ─── QR Generation Toggle ─────────────────────────────── */}
+        {/* QR Generation Toggle */}
         <div className={`flex items-center justify-between ${!headerImageEnabled ? 'opacity-60' : ''}`}>
           <span className="text-[10px] font-semibold text-gray-500 uppercase">Generate QR codes</span>
           <label className="relative inline-flex items-center cursor-pointer">
@@ -116,7 +170,6 @@ export default function SettingsPanel({
           </label>
         </div>
 
-        {/* Design selection (when QR is enabled) */}
         {generateQr && headerImageEnabled && (
           <div>
             <label className="text-[10px] font-semibold text-gray-400 uppercase">Pass Design</label>
@@ -150,7 +203,6 @@ export default function SettingsPanel({
             placeholder="+234 801 234 5678" className="w-full border border-gray-200 rounded-lg p-2 text-xs mt-1 bg-white focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none transition-shadow" />
         </div>
 
-        {/* Progress */}
         {isRunning && (
           <div className="mt-3">
             <ProgressBar value={progress} max={100} label="Progress" />
@@ -158,7 +210,6 @@ export default function SettingsPanel({
           </div>
         )}
 
-        {/* Launch Button */}
         <button
           onClick={onLaunch}
           disabled={panelDisabled || !canLaunch || isRunning || uploadingHeader}
