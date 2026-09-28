@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
 import { useToast } from '../layout/Toast';
-import { normalizePhone } from '../../utils/formatters';
 
 export default function UploadPanel({ onReset, onFileParsed }) {
   const navigate = useNavigate();
@@ -19,8 +18,10 @@ export default function UploadPanel({ onReset, onFileParsed }) {
         const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
         if (json.length === 0) throw new Error('Empty file');
 
-        // Convert all numeric values to full strings, then normalize phone numbers
-        const formattedData = json.map(row => {
+        // Only expand scientific-notation numbers into full numeric strings.
+        // Phone normalization now lives on the backend and is driven by the
+        // campaign's `autoAddCountryCode` / `defaultCountryCode` setting.
+        const formattedData = json.map((row) => {
           const newRow = {};
           Object.entries(row).forEach(([key, value]) => {
             if (typeof value === 'number') {
@@ -29,17 +30,9 @@ export default function UploadPanel({ onReset, onFileParsed }) {
               newRow[key] = value;
             }
           });
-
-          // Normalize phone number column if it exists
-          const phoneKey = Object.keys(newRow).find(k => k.toLowerCase().includes('phone'));
-          if (phoneKey && newRow[phoneKey]) {
-            newRow[phoneKey] = normalizePhone(newRow[phoneKey]);
-          }
-
           return newRow;
         });
 
-        // If custom callback provided, use it; otherwise navigate to spreadsheet editor
         if (onFileParsed) {
           onFileParsed(formattedData);
         } else {
