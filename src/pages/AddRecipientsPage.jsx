@@ -12,7 +12,6 @@ import {
 } from '../services/campaignService';
 import { getTemplates } from '../services/templateService';
 import { getDesigns } from '../services/designService';
-import { normalizePhone } from '../utils/formatters';
 
 export default function AddRecipientsPage() {
   const { campaignId } = useParams();
@@ -33,24 +32,20 @@ export default function AddRecipientsPage() {
   const [progress, setProgress] = useState({ total: 0, completed: 0, status: 'pending', phase: 'none' });
   const pollingRef = useRef(null);
 
-  // Fetch campaign and data
   useEffect(() => {
     const fetchData = async () => {
       try {
         const campaignRes = await getCampaignById(campaignId);
         const campaignData = campaignRes.data || campaignRes;
         setCampaign(campaignData);
-
-        if (campaignData.mapping) {
-          setMapping(campaignData.mapping);
-        }
+        if (campaignData.mapping) setMapping(campaignData.mapping);
 
         const templatesRes = await getTemplates();
         let apiTemplates = templatesRes.data?.templates || templatesRes.data || templatesRes || [];
         if (!Array.isArray(apiTemplates)) apiTemplates = [];
         const list = [];
         const defs = {};
-        apiTemplates.forEach(t => {
+        apiTemplates.forEach((t) => {
           list.push({ id: t._id, name: t.name });
           defs[t._id] = {
             name: t.name,
@@ -78,9 +73,7 @@ export default function AddRecipientsPage() {
 
   const handleFileParsed = useCallback((data) => {
     setParsedData(data);
-    if (data.length > 0) {
-      setColumns(Object.keys(data[0]));
-    }
+    if (data.length > 0) setColumns(Object.keys(data[0]));
   }, []);
 
   const handleCellChange = (rowIndex, col, value) => {
@@ -91,13 +84,13 @@ export default function AddRecipientsPage() {
 
   const addRow = () => {
     const newRow = {};
-    columns.forEach(col => { newRow[col] = ''; });
-    setParsedData(prev => [...prev, newRow]);
+    columns.forEach((col) => { newRow[col] = ''; });
+    setParsedData((prev) => [...prev, newRow]);
   };
 
   const deleteRow = (index) => {
     if (parsedData.length <= 1) return;
-    setParsedData(prev => prev.filter((_, i) => i !== index));
+    setParsedData((prev) => prev.filter((_, i) => i !== index));
   };
 
   const renameColumn = (oldName, newName) => {
@@ -106,30 +99,30 @@ export default function AddRecipientsPage() {
       alert('A column with that name already exists.');
       return;
     }
-    const updatedData = parsedData.map(row => {
+    const updatedData = parsedData.map((row) => {
       const newRow = { ...row };
       newRow[newName] = newRow[oldName] || '';
       delete newRow[oldName];
       return newRow;
     });
-    setColumns(prev => prev.map(c => (c === oldName ? newName : c)));
+    setColumns((prev) => prev.map((c) => (c === oldName ? newName : c)));
     setParsedData(updatedData);
   };
 
   const addColumn = () => {
     const newCol = `Column_${columns.length + 1}`;
-    setParsedData(prev => prev.map(row => ({ ...row, [newCol]: '' })));
-    setColumns(prev => [...prev, newCol]);
+    setParsedData((prev) => prev.map((row) => ({ ...row, [newCol]: '' })));
+    setColumns((prev) => [...prev, newCol]);
   };
 
   const deleteColumn = (col) => {
     if (columns.length <= 1) return;
-    setParsedData(prev => prev.map(row => {
+    setParsedData((prev) => prev.map((row) => {
       const newRow = { ...row };
       delete newRow[col];
       return newRow;
     }));
-    setColumns(prev => prev.filter(c => c !== col));
+    setColumns((prev) => prev.filter((c) => c !== col));
   };
 
   const handleSubmit = async () => {
@@ -142,15 +135,16 @@ export default function AddRecipientsPage() {
       return;
     }
 
-    const recipients = parsedData.map(row => ({
+    // ✅ Send the phone AS-IS. The backend normalizes it using the
+    //    campaign's autoAddCountryCode / defaultCountryCode setting.
+    const recipients = parsedData.map((row) => ({
       ...row,
-      phone: normalizePhone(row[mapping.phone] || ''),
+      phone: row[mapping.phone] || '',
     }));
 
     setIsSubmitting(true);
     try {
       await addRecipientsToCampaign(campaignId, recipients, { generateQr, sendNow });
-      // Start polling progress
       startPolling();
     } catch (err) {
       showToast('error', 'Failed to add recipients', err.message);
@@ -186,12 +180,7 @@ export default function AddRecipientsPage() {
     }, 2000);
   };
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, []);
+  useEffect(() => () => { if (pollingRef.current) clearInterval(pollingRef.current); }, []);
 
   if (loading) {
     return (
@@ -213,21 +202,28 @@ export default function AddRecipientsPage() {
           </button>
         </div>
 
+        {/* Info banner about the campaign's phone setting */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+          <i className="fas fa-phone mr-1"></i>
+          <strong>Phone format:</strong>{' '}
+          {campaign?.autoAddCountryCode ? (
+            <>auto-add country code <code className="bg-white px-1 rounded">+{campaign?.defaultCountryCode || '234'}</code></>
+          ) : (
+            <>numbers will be stored exactly as submitted (no country code added)</>
+          )}
+          . Change this in the original campaign's settings if needed.
+        </div>
+
         <UploadPanel onFileParsed={handleFileParsed} />
 
         {parsedData && (
           <>
-            {/* Editable sheet */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <div className="flex justify-between items-center mb-3">
                 <h2 className="text-sm font-bold text-gray-700">Review & Edit Sheet</h2>
                 <div className="flex gap-2">
-                  <button onClick={addRow} className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
-                    + Add Row
-                  </button>
-                  <button onClick={addColumn} className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">
-                    + Add Column
-                  </button>
+                  <button onClick={addRow} className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">+ Add Row</button>
+                  <button onClick={addColumn} className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">+ Add Column</button>
                 </div>
               </div>
 
@@ -236,7 +232,7 @@ export default function AddRecipientsPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-2 py-2 text-left">#</th>
-                      {columns.map(col => (
+                      {columns.map((col) => (
                         <th key={col} className="px-2 py-2 text-left group relative">
                           <input
                             type="text"
@@ -260,7 +256,7 @@ export default function AddRecipientsPage() {
                     {parsedData.map((row, rowIdx) => (
                       <tr key={rowIdx} className="hover:bg-gray-50">
                         <td className="px-2 py-1 text-gray-400">{rowIdx + 1}</td>
-                        {columns.map(col => (
+                        {columns.map((col) => (
                           <td key={col} className="px-2 py-1">
                             <input
                               type="text"
@@ -271,11 +267,7 @@ export default function AddRecipientsPage() {
                           </td>
                         ))}
                         <td className="px-2 py-1">
-                          <button
-                            onClick={() => deleteRow(rowIdx)}
-                            className="text-red-400 hover:text-red-600"
-                            title="Delete row"
-                          >
+                          <button onClick={() => deleteRow(rowIdx)} className="text-red-400 hover:text-red-600" title="Delete row">
                             <i className="fas fa-trash"></i>
                           </button>
                         </td>
@@ -286,7 +278,6 @@ export default function AddRecipientsPage() {
               </div>
             </div>
 
-            {/* Mapping */}
             <MappingPanel
               columns={columns}
               mapping={mapping}
@@ -304,27 +295,17 @@ export default function AddRecipientsPage() {
               showQrFields={false}
             />
 
-            {/* Options */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm space-y-3">
               <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={generateQr}
-                  onChange={(e) => setGenerateQr(e.target.checked)}
-                />
+                <input type="checkbox" checked={generateQr} onChange={(e) => setGenerateQr(e.target.checked)} />
                 Generate QR codes for new recipients
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={sendNow}
-                  onChange={(e) => setSendNow(e.target.checked)}
-                />
+                <input type="checkbox" checked={sendNow} onChange={(e) => setSendNow(e.target.checked)} />
                 Send WhatsApp message to new recipients now
               </label>
             </div>
 
-            {/* Progress Bar */}
             {isSubmitting && (
               <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                 <ProgressBar
