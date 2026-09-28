@@ -27,29 +27,15 @@ export const formatDuration = (seconds) => {
   return h > 0 ? `${d}d ${h}h` : `${d}d`;
 };
 
-/**
- * Normalize a phone number (mirrors the backend util).
- *
- * @param {string|number} phone
- * @param {object} [options]
- * @param {boolean} [options.enabled=true]
- *   true  → add country code / replace leading 0
- *   false → only strip non-digits
- * @param {string}  [options.countryCode='234']
- * @returns {string} Digits-only phone
- */
-export const normalizePhone = (phone, options = {}) => {
-  const { enabled = true, countryCode = '234' } = options;
-
-  if (phone === null || phone === undefined || phone === '') return '';
-  const digits = String(phone).replace(/\D/g, '');
-  if (!digits) return '';
-  if (!enabled) return digits;
-
-  if (digits.startsWith(countryCode)) return digits;
-  if (digits.startsWith('0')) return countryCode + digits.slice(1);
-  return countryCode + digits;
-};
+// ────────────────────────────────────────────────────────────────
+//  normalizePhone HAS BEEN REMOVED from the frontend.
+//
+//  All phone normalization now happens on the backend, driven by the
+//  campaign's stored `autoAddCountryCode` / `defaultCountryCode`.
+//
+//  Do not add a client-side copy of normalizePhone — it will silently
+//  corrupt numbers before the backend can apply the user's toggle.
+// ────────────────────────────────────────────────────────────────
 
 export const formatPhone = (phone) => {
   if (!phone) return '';
