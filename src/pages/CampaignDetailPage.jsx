@@ -11,9 +11,13 @@ import {
   getCampaignMessages,
 } from '../services/campaignService';
 import { getTemplateById } from '../services/templateService';
-import { normalizePhone } from '../utils/formatters';
 
-// ─── Small stat card (memoized) ─────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+//  NOTE: normalizePhone has been removed. The backend stores phone
+//  numbers in their final WhatsApp-ready form, so the UI must show
+//  them exactly as they were saved.
+// ────────────────────────────────────────────────────────────────
+
 const StatBadge = memo(({ label, value, color = 'gray', icon, subtitle }) => {
   const colorClasses = {
     green: 'bg-green-50 text-green-700 border-green-200',
@@ -22,7 +26,6 @@ const StatBadge = memo(({ label, value, color = 'gray', icon, subtitle }) => {
     orange: 'bg-orange-50 text-orange-700 border-orange-200',
     gray: 'bg-gray-50 text-gray-700 border-gray-200',
   };
-
   return (
     <div className={`rounded-xl border p-4 flex items-center gap-3 ${colorClasses[color] || colorClasses.gray}`}>
       {icon && <i className={`fas ${icon} text-lg`}></i>}
@@ -35,42 +38,29 @@ const StatBadge = memo(({ label, value, color = 'gray', icon, subtitle }) => {
   );
 });
 
-// ─── Recipient Details Modal (memoized) ─────────────────────────
 const RecipientDetailModal = memo(({ recipient, onClose }) => {
   if (!recipient) return null;
-
   const fields = Object.entries(recipient).filter(
     ([key]) => !['_id', 'qrUrl'].includes(key)
   );
-
   return (
     <Modal isOpen={!!recipient} onClose={onClose} title="Recipient Details" size="max-w-md">
       <div className="space-y-4">
         {recipient.qrUrl && (
           <div className="flex justify-center">
-            <img
-              src={recipient.qrUrl}
-              alt="QR Code"
-              className="w-32 h-32 object-contain border rounded-lg"
-            />
+            <img src={recipient.qrUrl} alt="QR Code" className="w-32 h-32 object-contain border rounded-lg" />
           </div>
         )}
-
         <div className="space-y-2">
           {fields.map(([key, value]) => (
             <div key={key} className="flex justify-between gap-4 py-1 border-b border-gray-100">
               <span className="text-xs font-semibold text-gray-500 capitalize">{key}</span>
-              <span className="text-xs text-gray-800 text-right break-all">
-                {String(value ?? '—')}
-              </span>
+              <span className="text-xs text-gray-800 text-right break-all">{String(value ?? '—')}</span>
             </div>
           ))}
         </div>
-
         <div className="flex justify-end pt-2">
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
+          <Button variant="outline" onClick={onClose}>Close</Button>
         </div>
       </div>
     </Modal>
@@ -90,27 +80,27 @@ export default function CampaignDetailPage() {
   const [retrying, setRetrying] = useState(false);
   const [resettingId, setResettingId] = useState(null);
 
-  // ─── Manual send state ───────────────────────────────────────
   const [selectedRecipientId, setSelectedRecipientId] = useState('');
   const [detailRecipient, setDetailRecipient] = useState(null);
-
-  // ─── State for message thread modal ─────────────────────────
   const [messageRecipient, setMessageRecipient] = useState(null);
 
-  // ─── Unread indicators ─────────────────────────────────────
   const baselineMessageIdsRef = useRef(new Set());
   const openedThreadPhonesRef = useRef(new Set());
   const [newMessagePhones, setNewMessagePhones] = useState(new Set());
 
   const isModalOpen = !!messageRecipient || !!detailRecipient;
 
-  // Fetch campaign details
   const fetchCampaign = useCallback(async () => {
     try {
       setLoading(true);
       const res = await getCampaignById(campaignId);
       const campaignData = res.data || res;
       setCampaign(campaignData);
+
+      // 🔎 DEBUG: prove the raw stored phone from the API
+      console.log('[CampaignDetailPage] recipients from API:',
+        (campaignData.recipients || []).map(r => ({ name: r.name, phone: r.phone }))
+      );
 
       if (campaignData.templateId) {
         const tplRes = await getTemplateById(campaignData.templateId);
@@ -124,11 +114,8 @@ export default function CampaignDetailPage() {
     }
   }, [campaignId, navigate, showToast]);
 
-  useEffect(() => {
-    fetchCampaign();
-  }, [fetchCampaign]);
+  useEffect(() => { fetchCampaign(); }, [fetchCampaign]);
 
-  // Poll for new incoming messages (detect unread)
   const fetchNewMessages = useCallback(async () => {
     if (document.visibilityState === 'hidden' || isModalOpen) return;
     try {
@@ -146,16 +133,12 @@ export default function CampaignDetailPage() {
         const msgId = msg._id || msg.whatsappMessageId;
         if (!baselineMessageIdsRef.current.has(msgId) && msg.direction === 'incoming') {
           const phone = msg.phone;
-          if (!openedThreadPhonesRef.current.has(phone)) {
-            newIncomingPhones.add(phone);
-          }
+          if (!openedThreadPhonesRef.current.has(phone)) newIncomingPhones.add(phone);
         }
       }
-
       if (newIncomingPhones.size > 0) {
         setNewMessagePhones(prev => new Set([...prev, ...newIncomingPhones]));
       }
-
       baselineMessageIdsRef.current = currentIds;
     } catch (err) {
       console.error('Failed to fetch new messages:', err);
@@ -165,10 +148,8 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     if (!campaignId) return;
     fetchNewMessages();
-    const interval = setInterval(fetchNewMessages, 60000); // 60 seconds
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchNewMessages();
-    };
+    const interval = setInterval(fetchNewMessages, 60000);
+    const handleVisibility = () => { if (document.visibilityState === 'visible') fetchNewMessages(); };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       clearInterval(interval);
@@ -177,7 +158,7 @@ export default function CampaignDetailPage() {
   }, [campaignId, fetchNewMessages]);
 
   const handleOpenMessages = (recipient) => {
-    const phone = normalizePhone(recipient.phone);
+    const phone = recipient.phone;            // ✅ use stored phone as-is
     setMessageRecipient(recipient);
     setNewMessagePhones(prev => {
       const next = new Set(prev);
@@ -189,10 +170,7 @@ export default function CampaignDetailPage() {
 
   const handleRetryAll = async () => {
     const failedCount = campaign?.recipients?.filter(r => r.status === 'failed').length || 0;
-    if (failedCount === 0) {
-      showToast('info', 'Nothing to retry', 'No failed recipients to retry.');
-      return;
-    }
+    if (failedCount === 0) { showToast('info', 'Nothing to retry', 'No failed recipients to retry.'); return; }
     if (!window.confirm(`Retry sending to ${failedCount} failed recipient(s)?`)) return;
     setRetrying(true);
     try {
@@ -208,10 +186,7 @@ export default function CampaignDetailPage() {
 
   const handleResetCheckIn = async (recipient) => {
     const identifier = recipient._id || recipient.phone;
-    if (!identifier) {
-      showToast('error', 'Invalid recipient', 'Cannot identify recipient.');
-      return;
-    }
+    if (!identifier) { showToast('error', 'Invalid recipient', 'Cannot identify recipient.'); return; }
     if (!window.confirm('Reactivate this QR code? The attendee will be able to scan again.')) return;
     setResettingId(identifier);
     try {
@@ -225,8 +200,9 @@ export default function CampaignDetailPage() {
     }
   };
 
+  // ✅ openWhatsAppForRecipient — no frontend normalize, just strip '+' for wa.me
   const openWhatsAppForRecipient = (phone, recipientData = null) => {
-    const normalizedPhone = normalizePhone(phone).replace(/^\+/, '');
+    const normalizedPhone = String(phone || '').replace(/^\+/, '');
 
     let messageBody = '';
     if (template && template.variants && template.variants.length > 0) {
@@ -255,8 +231,7 @@ export default function CampaignDetailPage() {
     }
 
     const encodedMessage = encodeURIComponent(finalMessage);
-    const waLink = `https://wa.me/${normalizedPhone}?text=${encodedMessage}`;
-    window.open(waLink, '_blank');
+    window.open(`https://wa.me/${normalizedPhone}?text=${encodedMessage}`, '_blank');
   };
 
   const handleOpenWhatsAppManual = () => {
@@ -267,16 +242,11 @@ export default function CampaignDetailPage() {
     const recipient = campaign.recipients?.find(
       r => (r._id || r.phone) === selectedRecipientId
     );
-    if (recipient) {
-      openWhatsAppForRecipient(recipient.phone, recipient);
-    }
+    if (recipient) openWhatsAppForRecipient(recipient.phone, recipient);
   };
 
   const exportCSV = () => {
-    if (!campaign?.recipients?.length) {
-      showToast('warning', 'No data', 'No recipients to export.');
-      return;
-    }
+    if (!campaign?.recipients?.length) { showToast('warning', 'No data', 'No recipients to export.'); return; }
     const headers = ['Attendee Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
     const rows = campaign.recipients.map(r => [
       r.name || '',
@@ -305,11 +275,7 @@ export default function CampaignDetailPage() {
   }
 
   if (!campaign) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
-        Campaign not found.
-      </div>
-    );
+    return <div className="flex-1 flex items-center justify-center text-gray-500">Campaign not found.</div>;
   }
 
   const recipients = campaign.recipients || [];
@@ -321,9 +287,7 @@ export default function CampaignDetailPage() {
   const deliveryRate = total > 0 ? Math.round((sent / total) * 100) : 0;
 
   let filteredRecipients = recipients;
-  if (statusFilter !== 'all') {
-    filteredRecipients = filteredRecipients.filter(r => r.status === statusFilter);
-  }
+  if (statusFilter !== 'all') filteredRecipients = filteredRecipients.filter(r => r.status === statusFilter);
   if (search) {
     const s = search.toLowerCase();
     filteredRecipients = filteredRecipients.filter(r =>
@@ -343,11 +307,9 @@ export default function CampaignDetailPage() {
     return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${colors[status] || 'bg-gray-100 text-gray-500'}`}>{status}</span>;
   };
 
-  const checkInBadge = (checkedIn) => {
-    return checkedIn
-      ? <span className="text-xs text-green-600"><i className="fas fa-check-circle"></i> Checked In</span>
-      : <span className="text-xs text-gray-400"><i className="fas fa-circle"></i> Not checked</span>;
-  };
+  const checkInBadge = (checkedIn) => checkedIn
+    ? <span className="text-xs text-green-600"><i className="fas fa-check-circle"></i> Checked In</span>
+    : <span className="text-xs text-gray-400"><i className="fas fa-circle"></i> Not checked</span>;
 
   const selectedManualRecipient = recipients.find(r => (r._id || r.phone) === selectedRecipientId);
 
@@ -368,43 +330,24 @@ export default function CampaignDetailPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              icon="user-plus"
-              onClick={() => navigate(`/campaigns/${campaignId}/add-recipients`)}
-            >
+            <Button variant="outline" icon="user-plus" onClick={() => navigate(`/campaigns/${campaignId}/add-recipients`)}>
               Add Recipients
             </Button>
-            <Button variant="outline" onClick={exportCSV} icon="download">
-              Export CSV
-            </Button>
-            <Button
-              variant="outline"
-              icon="list"
-              onClick={() => navigate(`/campaigns/${campaignId}/logs`)}
-            >
+            <Button variant="outline" onClick={exportCSV} icon="download">Export CSV</Button>
+            <Button variant="outline" icon="list" onClick={() => navigate(`/campaigns/${campaignId}/logs`)}>
               View Logs
             </Button>
             <Button variant="primary" onClick={() => navigate(`/check-in/${campaignId}`)} icon="qrcode">
               Check-In
             </Button>
-            <button
-              onClick={fetchCampaign}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
-              title="Refresh"
-            >
+            <button onClick={fetchCampaign} className="p-2 rounded-full hover:bg-gray-100 text-gray-500" title="Refresh">
               <i className="fas fa-sync-alt"></i>
             </button>
-            <button
-              onClick={() => navigate(-1)}
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
-              ← Back
-            </button>
+            <button onClick={() => navigate(-1)} className="text-sm text-gray-500 hover:text-gray-700">← Back</button>
           </div>
         </div>
 
-        {/* Manual Send Section with Dropdown */}
+        {/* Manual Send */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <h2 className="text-sm font-bold text-gray-700 mb-3">Send Manual Message via WhatsApp</h2>
           <div className="flex flex-wrap items-center gap-2">
@@ -416,7 +359,7 @@ export default function CampaignDetailPage() {
               <option value="">-- Select Recipient --</option>
               {recipients.map(r => (
                 <option key={r._id || r.phone} value={r._id || r.phone}>
-                  {r.name || 'Unknown'} ({normalizePhone(r.phone)})
+                  {r.name || 'Unknown'} ({r.phone})
                 </option>
               ))}
             </select>
@@ -432,7 +375,7 @@ export default function CampaignDetailPage() {
                 <span className="text-gray-500">Attendee Name:</span>
                 <span className="font-medium">{selectedManualRecipient.name || '—'}</span>
                 <span className="text-gray-500">Phone:</span>
-                <span className="font-medium">{normalizePhone(selectedManualRecipient.phone)}</span>
+                <span className="font-medium">{selectedManualRecipient.phone}</span>
                 <span className="text-gray-500">Status:</span>
                 <span>{statusBadge(selectedManualRecipient.status)}</span>
                 <span className="text-gray-500">Check‑In:</span>
@@ -450,7 +393,7 @@ export default function CampaignDetailPage() {
           )}
         </div>
 
-        {/* Summary Cards */}
+        {/* Summary */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <StatBadge label="Total" value={total} color="gray" icon="fa-users" />
           <StatBadge label="Sent" value={sent} color="green" icon="fa-check-circle" />
@@ -459,7 +402,7 @@ export default function CampaignDetailPage() {
           <StatBadge label="Checked In" value={checkedIn} color="blue" icon="fa-qrcode" subtitle={`${total > 0 ? Math.round((checkedIn / total) * 100) : 0}%`} />
         </div>
 
-        {/* Delivery Progress */}
+        {/* Delivery progress */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Delivery Progress</span>
@@ -499,12 +442,10 @@ export default function CampaignDetailPage() {
               className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none bg-white"
             />
           </div>
-          <div className="text-xs text-gray-500">
-            Showing {filteredRecipients.length} of {total}
-          </div>
+          <div className="text-xs text-gray-500">Showing {filteredRecipients.length} of {total}</div>
         </div>
 
-        {/* Main Table */}
+        {/* Table */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 border-b">
@@ -521,14 +462,11 @@ export default function CampaignDetailPage() {
             <tbody className="divide-y divide-gray-100">
               {filteredRecipients.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-6 text-center text-gray-400 text-sm">
-                    No recipients found.
-                  </td>
+                  <td colSpan="7" className="px-4 py-6 text-center text-gray-400 text-sm">No recipients found.</td>
                 </tr>
               ) : (
                 filteredRecipients.map((r, idx) => {
-                  const phoneNormalized = normalizePhone(r.phone);
-                  const hasNew = newMessagePhones.has(phoneNormalized);
+                  const hasNew = newMessagePhones.has(r.phone);
                   return (
                     <tr key={r._id || idx} className="hover:bg-gray-50 transition">
                       <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
@@ -539,18 +477,13 @@ export default function CampaignDetailPage() {
                           className="font-mono text-xs text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline"
                           title="View details"
                         >
-                          {phoneNormalized}
+                          {r.phone}
                         </button>
                       </td>
                       <td className="px-4 py-3">{statusBadge(r.status)}</td>
                       <td className="px-4 py-3">
                         {r.qrUrl ? (
-                          <a
-                            href={r.qrUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block w-10 h-10 border rounded overflow-hidden"
-                          >
+                          <a href={r.qrUrl} target="_blank" rel="noopener noreferrer" className="inline-block w-10 h-10 border rounded overflow-hidden">
                             <img src={r.qrUrl} alt="QR" className="w-full h-full object-cover" />
                           </a>
                         ) : (
@@ -600,7 +533,7 @@ export default function CampaignDetailPage() {
           </table>
         </div>
 
-        {/* Failed Recipients Section */}
+        {/* Failed */}
         {failedRecipients.length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
@@ -608,28 +541,18 @@ export default function CampaignDetailPage() {
                 <i className="fas fa-times-circle"></i>
                 Failed Recipients ({failedRecipients.length})
               </h3>
-              <Button
-                variant="danger"
-                onClick={handleRetryAll}
-                disabled={retrying}
-              >
+              <Button variant="danger" onClick={handleRetryAll} disabled={retrying}>
                 {retrying ? 'Retrying...' : 'Retry All Failed'}
               </Button>
             </div>
-
             <div className="space-y-2 max-h-72 overflow-y-auto">
               {failedRecipients.map((r, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white rounded-lg border border-red-100 p-3 text-sm flex items-start justify-between gap-3"
-                >
+                <div key={idx} className="bg-white rounded-lg border border-red-100 p-3 text-sm flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-700">
-                      {r.name || 'Unknown'} <span className="text-gray-400">({normalizePhone(r.phone)})</span>
+                      {r.name || 'Unknown'} <span className="text-gray-400">({r.phone})</span>
                     </p>
-                    <p className="text-xs text-red-600 mt-0.5">
-                      Reason: {r.failureReason || 'Unknown error'}
-                    </p>
+                    <p className="text-xs text-red-600 mt-0.5">Reason: {r.failureReason || 'Unknown error'}</p>
                   </div>
                 </div>
               ))}
@@ -643,23 +566,18 @@ export default function CampaignDetailPage() {
           </div>
         )}
 
-        {/* Recipient Detail Modal */}
-        <RecipientDetailModal
-          recipient={detailRecipient}
-          onClose={() => setDetailRecipient(null)}
-        />
+        <RecipientDetailModal recipient={detailRecipient} onClose={() => setDetailRecipient(null)} />
 
-        {/* Message Thread Modal */}
         <Modal
           isOpen={!!messageRecipient}
           onClose={() => setMessageRecipient(null)}
-          title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient ? normalizePhone(messageRecipient.phone) : ''})`}
+          title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient?.phone || ''})`}
           size="max-w-2xl"
         >
           {messageRecipient && (
             <MessageThread
               campaignId={campaignId}
-              phone={normalizePhone(messageRecipient.phone)}
+              phone={messageRecipient.phone}
               showHeader={false}
             />
           )}
