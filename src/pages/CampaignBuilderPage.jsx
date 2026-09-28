@@ -20,7 +20,8 @@ import {
 } from '../services/campaignService';
 import { getTemplates } from '../services/templateService';
 import { getDesigns } from '../services/designService';
-import { normalizePhone } from '../utils/formatters';
+import { getSettings } from '../services/settingsService';
+import { COUNTRY_OPTIONS, DEFAULT_COUNTRY_CODE } from '../utils/countries';
 
 // ─── Static fallback templates (with quickReplies added) ────────
 const staticFallback = [
@@ -207,6 +208,10 @@ export default function CampaignBuilderPage() {
   const [qrGenProgress, setQrGenProgress] = useState(0);
   const pollingRef = useRef(null);
 
+  // ✅ Phone number normalization
+  const [autoAddCountryCode, setAutoAddCountryCode] = useState(true);
+  const [defaultCountryCode, setDefaultCountryCode] = useState(DEFAULT_COUNTRY_CODE);
+
   // ─── Header image state ──────────────────────────────────────
   const [headerImageUrl, setHeaderImageUrl] = useState('');
   const [uploadingHeader, setUploadingHeader] = useState(false);
@@ -304,6 +309,17 @@ export default function CampaignBuilderPage() {
   useEffect(() => {
     getDesigns()
       .then((res) => setDesigns(res.data?.data || res.data || []))
+      .catch(() => {});
+  }, []);
+
+  // ─── Fetch user's phone-number defaults from Settings ─────────
+  useEffect(() => {
+    getSettings()
+      .then((res) => {
+        const md = (res?.data || res)?.messageDefaults || {};
+        if (md.autoAddCountryCode !== undefined) setAutoAddCountryCode(md.autoAddCountryCode);
+        if (md.defaultCountryCode) setDefaultCountryCode(md.defaultCountryCode);
+      })
       .catch(() => {});
   }, []);
 
@@ -466,7 +482,7 @@ export default function CampaignBuilderPage() {
     }
   };
 
-  // ─── NEW: Toggle Include Header Image (and update backend if campaign exists) ──
+  // ─── Toggle Include Header Image (and update backend if campaign exists) ──
   const handleIncludeHeaderImageToggle = async (checked) => {
     setIncludeHeaderImage(checked);
     if (!checked) {
@@ -499,7 +515,8 @@ export default function CampaignBuilderPage() {
         Object.entries(row).forEach(([key, value]) => {
           rec[key] = value === null || value === undefined ? '' : String(value);
         });
-        rec.phone = normalizePhone(row[mappingObj.phone] || '');
+        // ✅ Send raw — backend normalizes based on autoAddCountryCode.
+        rec.phone = row[mappingObj.phone] || '';
         return rec;
       });
       const campaignData = {
@@ -520,6 +537,9 @@ export default function CampaignBuilderPage() {
         headerImageUrl: includeHeaderImage ? (headerImageUrl || undefined) : undefined,
         designId: includeHeaderImage && generateQr ? (designId || undefined) : undefined,
         includeHeaderImage,
+        // ✅ New: phone-number normalization
+        autoAddCountryCode,
+        defaultCountryCode,
       };
 
       const res = await createCampaign(campaignData);
@@ -554,6 +574,8 @@ export default function CampaignBuilderPage() {
     startQrPolling,
     headerImageUrl,
     includeHeaderImage,
+    autoAddCountryCode,
+    defaultCountryCode,
   ]);
 
   // ─── Build restore state for navigation ──────────────────────
@@ -571,6 +593,8 @@ export default function CampaignBuilderPage() {
     campaignName,
     headerImageUrl,
     includeHeaderImage,
+    autoAddCountryCode,
+    defaultCountryCode,
   });
 
   // ─── Data loading effect ─────────────────────────────────
@@ -602,6 +626,8 @@ export default function CampaignBuilderPage() {
     if (restoreState?.campaignName) setCampaignName(restoreState.campaignName);
     if (restoreState?.headerImageUrl) setHeaderImageUrl(restoreState.headerImageUrl);
     if (restoreState?.includeHeaderImage !== undefined) setIncludeHeaderImage(restoreState.includeHeaderImage);
+    if (restoreState?.autoAddCountryCode !== undefined) setAutoAddCountryCode(restoreState.autoAddCountryCode);
+    if (restoreState?.defaultCountryCode) setDefaultCountryCode(restoreState.defaultCountryCode);
 
     setPreviewRecipientIndex(0);
     const active = activeVariants[template] || [];
@@ -674,6 +700,9 @@ export default function CampaignBuilderPage() {
     setGenerateQr(!!campaign.designId);
     setHeaderImageUrl(campaign.headerImageUrl || '');
     setIncludeHeaderImage(!!(campaign.headerImageUrl || campaign.designId));
+    // ✅ Load campaign-level phone settings
+    if (campaign.autoAddCountryCode !== undefined) setAutoAddCountryCode(campaign.autoAddCountryCode);
+    if (campaign.defaultCountryCode) setDefaultCountryCode(campaign.defaultCountryCode);
     showToast('info', 'Campaign Loaded', `"${campaign.name}" is ready for editing.`);
   };
 
@@ -771,6 +800,9 @@ export default function CampaignBuilderPage() {
           headerImageUrl: includeHeaderImage ? (headerImageUrl || undefined) : undefined,
           designId: includeHeaderImage && generateQr ? (designId || undefined) : undefined,
           includeHeaderImage,
+          // ✅ New: phone-number normalization
+          autoAddCountryCode,
+          defaultCountryCode,
         });
         cid = created.data?._id || created.data?.id;
         setCampaignId(cid);
@@ -856,6 +888,9 @@ export default function CampaignBuilderPage() {
     setHeaderImageUrl('');
     setUploadingHeader(false);
     setIncludeHeaderImage(false);
+    // ✅ Reset phone normalization to defaults (user can override per campaign)
+    setAutoAddCountryCode(true);
+    setDefaultCountryCode(DEFAULT_COUNTRY_CODE);
   };
 
   // ─── Toggle QR generation (only active if includeHeaderImage) ──
@@ -1172,6 +1207,10 @@ export default function CampaignBuilderPage() {
           panelDisabled={panelDisabled}
           canLaunch={canLaunch}
           headerImageEnabled={includeHeaderImage}
+          autoAddCountryCode={autoAddCountryCode}
+          setAutoAddCountryCode={setAutoAddCountryCode}
+          defaultCountryCode={defaultCountryCode}
+          setDefaultCountryCode={setDefaultCountryCode}
         />
       </div>
     </div>
