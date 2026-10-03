@@ -166,7 +166,7 @@ export default function MessageLogsPage() {
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Sent At</th>
                 <th className="px-4 py-3 text-left">Updated At</th>
-                <th className="px-4 py-3 text-left">Failure Reason</th>
+                <th className="px-4 py-3 text-left">Failure Reasons</th>
                 <th className="px-4 py-3 text-left">Action</th>
               </tr>
             </thead>
