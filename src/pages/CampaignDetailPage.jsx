@@ -13,18 +13,10 @@ import {
 import { getTemplateById } from '../services/templateService';
 
 // ────────────────────────────────────────────────────────────────
-//  Helpers to safely extract recipient data regardless of how
-//  the backend maps the Excel headers (e.g., 'Name' vs 'name').
+//  NOTE: normalizePhone has been removed. The backend stores phone
+//  numbers in their final WhatsApp-ready form, so the UI must show
+//  them exactly as they were saved.
 // ────────────────────────────────────────────────────────────────
-const getRecipientName = (r) => {
-  if (!r) return 'Unknown';
-  return r.name || r['Attendee Name'] || r['Name'] || r['attendeeName'] || getRecipientPhone(r) || '—';
-};
-
-const getRecipientPhone = (r) => {
-  if (!r) return '';
-  return r.phone || r['Phone Number'] || r['phoneNumber'] || '';
-};
 
 const StatBadge = memo(({ label, value, color = 'gray', icon, subtitle }) => {
   const colorClasses = {
@@ -87,9 +79,6 @@ export default function CampaignDetailPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [retrying, setRetrying] = useState(false);
   const [resettingId, setResettingId] = useState(null);
-  
-  // 👇 Added toggle to hide blank names (optional, but keeps UI clean if you upload blank rows later)
-  const [hideNameless, setHideNameless] = useState(true);
 
   const [selectedRecipientId, setSelectedRecipientId] = useState('');
   const [detailRecipient, setDetailRecipient] = useState(null);
@@ -107,6 +96,11 @@ export default function CampaignDetailPage() {
       const res = await getCampaignById(campaignId);
       const campaignData = res.data || res;
       setCampaign(campaignData);
+
+      // 🔎 DEBUG: prove the raw stored phone from the API
+      console.log('[CampaignDetailPage] recipients from API:',
+        (campaignData.recipients || []).map(r => ({ name: r.name, phone: r.phone }))
+      );
 
       if (campaignData.templateId) {
         const tplRes = await getTemplateById(campaignData.templateId);
@@ -164,7 +158,7 @@ export default function CampaignDetailPage() {
   }, [campaignId, fetchNewMessages]);
 
   const handleOpenMessages = (recipient) => {
-    const phone = getRecipientPhone(recipient);
+    const phone = recipient.phone;            // ✅ use stored phone as-is
     setMessageRecipient(recipient);
     setNewMessagePhones(prev => {
       const next = new Set(prev);
@@ -191,7 +185,7 @@ export default function CampaignDetailPage() {
   };
 
   const handleResetCheckIn = async (recipient) => {
-    const identifier = recipient._id || getRecipientPhone(recipient);
+    const identifier = recipient._id || recipient.phone;
     if (!identifier) { showToast('error', 'Invalid recipient', 'Cannot identify recipient.'); return; }
     if (!window.confirm('Reactivate this QR code? The attendee will be able to scan again.')) return;
     setResettingId(identifier);
@@ -206,6 +200,7 @@ export default function CampaignDetailPage() {
     }
   };
 
+  // ✅ openWhatsAppForRecipient — no frontend normalize, just strip '+' for wa.me
   const openWhatsAppForRecipient = (phone, recipientData = null) => {
     const normalizedPhone = String(phone || '').replace(/^\+/, '');
 
@@ -245,17 +240,17 @@ export default function CampaignDetailPage() {
       return;
     }
     const recipient = campaign.recipients?.find(
-      r => (r._id || getRecipientPhone(r)) === selectedRecipientId
+      r => (r._id || r.phone) === selectedRecipientId
     );
-    if (recipient) openWhatsAppForRecipient(getRecipientPhone(recipient), recipient);
+    if (recipient) openWhatsAppForRecipient(recipient.phone, recipient);
   };
 
   const exportCSV = () => {
     if (!campaign?.recipients?.length) { showToast('warning', 'No data', 'No recipients to export.'); return; }
     const headers = ['Attendee Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
     const rows = campaign.recipients.map(r => [
-      getRecipientName(r),
-      getRecipientPhone(r),
+      r.name || '',
+      r.phone || '',
       r.status || '',
       r.checkedIn ? 'Yes' : 'No',
       r.qrUrl || ''
@@ -292,21 +287,12 @@ export default function CampaignDetailPage() {
   const deliveryRate = total > 0 ? Math.round((sent / total) * 100) : 0;
 
   let filteredRecipients = recipients;
-  
-  // 👇 Filter out blank names if the toggle is on
-  if (hideNameless) {
-    filteredRecipients = filteredRecipients.filter(r => {
-      const name = r.name || r['Attendee Name'] || r['Name'] || r['attendeeName'];
-      return name && String(name).trim() !== '';
-    });
-  }
-
   if (statusFilter !== 'all') filteredRecipients = filteredRecipients.filter(r => r.status === statusFilter);
   if (search) {
     const s = search.toLowerCase();
     filteredRecipients = filteredRecipients.filter(r =>
-      (getRecipientName(r) && getRecipientName(r).toLowerCase().includes(s)) ||
-      (getRecipientPhone(r) && getRecipientPhone(r).toLowerCase().includes(s))
+      (r.name && r.name.toLowerCase().includes(s)) ||
+      (r.phone && r.phone.toLowerCase().includes(s))
     );
   }
 
@@ -325,7 +311,7 @@ export default function CampaignDetailPage() {
     ? <span className="text-xs text-green-600"><i className="fas fa-check-circle"></i> Checked In</span>
     : <span className="text-xs text-gray-400"><i className="fas fa-circle"></i> Not checked</span>;
 
-  const selectedManualRecipient = recipients.find(r => (r._id || getRecipientPhone(r)) === selectedRecipientId);
+  const selectedManualRecipient = recipients.find(r => (r._id || r.phone) === selectedRecipientId);
 
   return (
     <div className="flex-1 overflow-y-auto p-5 bg-gradient-to-br from-gray-50 via-white to-orange-50/30">
@@ -372,8 +358,8 @@ export default function CampaignDetailPage() {
             >
               <option value="">-- Select Recipient --</option>
               {recipients.map(r => (
-                <option key={r._id || getRecipientPhone(r)} value={r._id || getRecipientPhone(r)}>
-                  {getRecipientName(r)} ({getRecipientPhone(r)})
+                <option key={r._id || r.phone} value={r._id || r.phone}>
+                  {r.name || 'Unknown'} ({r.phone})
                 </option>
               ))}
             </select>
@@ -387,9 +373,9 @@ export default function CampaignDetailPage() {
               <p className="text-xs font-semibold text-gray-500 mb-2">Selected Recipient Details:</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 <span className="text-gray-500">Attendee Name:</span>
-                <span className="font-medium">{getRecipientName(selectedManualRecipient)}</span>
+                <span className="font-medium">{selectedManualRecipient.name || '—'}</span>
                 <span className="text-gray-500">Phone:</span>
-                <span className="font-medium">{getRecipientPhone(selectedManualRecipient)}</span>
+                <span className="font-medium">{selectedManualRecipient.phone}</span>
                 <span className="text-gray-500">Status:</span>
                 <span>{statusBadge(selectedManualRecipient.status)}</span>
                 <span className="text-gray-500">Check‑In:</span>
@@ -447,18 +433,6 @@ export default function CampaignDetailPage() {
               <option value="pending">Pending</option>
             </select>
           </div>
-          
-          {/* 👇 Toggle to hide blank names 👇 */}
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer ml-2">
-            <input 
-              type="checkbox" 
-              checked={hideNameless} 
-              onChange={(e) => setHideNameless(e.target.checked)}
-              className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-            />
-            Hide blank names
-          </label>
-
           <div className="flex-1 min-w-[200px]">
             <input
               type="text"
@@ -492,18 +466,18 @@ export default function CampaignDetailPage() {
                 </tr>
               ) : (
                 filteredRecipients.map((r, idx) => {
-                  const hasNew = newMessagePhones.has(getRecipientPhone(r));
+                  const hasNew = newMessagePhones.has(r.phone);
                   return (
                     <tr key={r._id || idx} className="hover:bg-gray-50 transition">
                       <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
-                      <td className="px-4 py-3 font-medium">{getRecipientName(r)}</td>
+                      <td className="px-4 py-3 font-medium">{r.name || '—'}</td>
                       <td className="px-4 py-3">
                         <button
                           onClick={() => setDetailRecipient(r)}
                           className="font-mono text-xs text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline"
                           title="View details"
                         >
-                          {getRecipientPhone(r)}
+                          {r.phone}
                         </button>
                       </td>
                       <td className="px-4 py-3">{statusBadge(r.status)}</td>
@@ -520,7 +494,7 @@ export default function CampaignDetailPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => openWhatsAppForRecipient(getRecipientPhone(r), r)}
+                            onClick={() => openWhatsAppForRecipient(r.phone, r)}
                             className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition"
                             title="Send message via WhatsApp"
                           >
@@ -539,10 +513,10 @@ export default function CampaignDetailPage() {
                           {r.checkedIn && (
                             <button
                               onClick={() => handleResetCheckIn(r)}
-                              disabled={resettingId === (r._id || getRecipientPhone(r))}
+                              disabled={resettingId === (r._id || r.phone)}
                               className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 transition disabled:opacity-50"
                             >
-                              {resettingId === (r._id || getRecipientPhone(r)) ? (
+                              {resettingId === (r._id || r.phone) ? (
                                 <><i className="fas fa-spinner fa-spin mr-1"></i>Resetting...</>
                               ) : (
                                 <><i className="fas fa-undo-alt mr-1"></i>Reset</>
@@ -576,7 +550,7 @@ export default function CampaignDetailPage() {
                 <div key={idx} className="bg-white rounded-lg border border-red-100 p-3 text-sm flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-700">
-                      {getRecipientName(r)} <span className="text-gray-400">({getRecipientPhone(r)})</span>
+                      {r.name || 'Unknown'} <span className="text-gray-400">({r.phone})</span>
                     </p>
                     <p className="text-xs text-red-600 mt-0.5">Reason: {r.failureReason || 'Unknown error'}</p>
                   </div>
@@ -597,13 +571,13 @@ export default function CampaignDetailPage() {
         <Modal
           isOpen={!!messageRecipient}
           onClose={() => setMessageRecipient(null)}
-          title={`Conversation with ${getRecipientName(messageRecipient)} (${getRecipientPhone(messageRecipient)})`}
+          title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient?.phone || ''})`}
           size="max-w-2xl"
         >
           {messageRecipient && (
             <MessageThread
               campaignId={campaignId}
-              phone={getRecipientPhone(messageRecipient)}
+              phone={messageRecipient.phone}
               showHeader={false}
             />
           )}
