@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import JSZip from 'jszip'; // 👈 Import JSZip
 import { useToast } from '../components/layout/Toast';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
@@ -13,8 +14,7 @@ import {
 import { getTemplateById } from '../services/templateService';
 
 // ────────────────────────────────────────────────────────────────
-//  Helpers to safely extract recipient data regardless of how
-//  the backend maps the Excel headers (e.g., 'Name' vs 'name').
+//  Helpers to safely extract recipient data
 // ────────────────────────────────────────────────────────────────
 const getRecipientName = (r) => {
   if (!r) return 'Unknown';
@@ -87,9 +87,10 @@ export default function CampaignDetailPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [retrying, setRetrying] = useState(false);
   const [resettingId, setResettingId] = useState(null);
-  
-  // 👇 Added toggle to hide blank names (optional, but keeps UI clean if you upload blank rows later)
   const [hideNameless, setHideNameless] = useState(true);
+  
+  // 👇 NEW: State to track ZIP download progress
+  const [downloading, setDownloading] = useState(false);
 
   const [selectedRecipientId, setSelectedRecipientId] = useState('');
   const [detailRecipient, setDetailRecipient] = useState(null);
@@ -250,6 +251,59 @@ export default function CampaignDetailPage() {
     if (recipient) openWhatsAppForRecipient(getRecipientPhone(recipient), recipient);
   };
 
+  // 👇 NEW: Function to download all QR codes as a ZIP
+  const downloadAllQrCodes = async () => {
+    const recipientsWithQr = (campaign?.recipients || []).filter(r => r.qrUrl);
+    
+    if (recipientsWithQr.length === 0) {
+      showToast('info', 'No QR Codes', 'No recipients in this campaign have QR codes to download.');
+      return;
+    }
+
+    if (!window.confirm(`Download ${recipientsWithQr.length} QR code image(s) as a ZIP file?`)) return;
+
+    setDownloading(true);
+    const zip = new JSZip();
+    const folder = zip.folder(`campaign_${campaignId}_qrcodes`);
+
+    try {
+      // Fetch all images concurrently
+      await Promise.all(recipientsWithQr.map(async (r, index) => {
+        try {
+          const response = await fetch(r.qrUrl);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          
+          // Create a safe filename using the recipient's name or phone number
+          const rawName = getRecipientName(r) || getRecipientPhone(r) || `recipient_${index}`;
+          const safeName = String(rawName).replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+          
+          // Add the image to the ZIP folder
+          folder.file(`QR_${safeName}_${getRecipientPhone(r)}.png`, blob);
+        } catch (err) {
+          console.error(`Failed to fetch QR for ${getRecipientPhone(r)}:`, err);
+          // We continue even if one image fails
+        }
+      }));
+
+      // Generate the ZIP file and trigger download
+      const content = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(content);
+      link.download = `campaign_${campaignId}_qrcodes.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      showToast('success', 'Download Started', 'Your ZIP file is downloading.');
+    } catch (err) {
+      showToast('error', 'Download Failed', 'Could not generate the ZIP file. ' + err.message);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const exportCSV = () => {
     if (!campaign?.recipients?.length) { showToast('warning', 'No data', 'No recipients to export.'); return; }
     const headers = ['Attendee Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
@@ -293,7 +347,6 @@ export default function CampaignDetailPage() {
 
   let filteredRecipients = recipients;
   
-  // 👇 Filter out blank names if the toggle is on
   if (hideNameless) {
     filteredRecipients = filteredRecipients.filter(r => {
       const name = r.name || r['Attendee Name'] || r['Name'] || r['attendeeName'];
@@ -348,6 +401,17 @@ export default function CampaignDetailPage() {
               Add Recipients
             </Button>
             <Button variant="outline" onClick={exportCSV} icon="download">Export CSV</Button>
+            
+            {/* 👇 NEW: Download QR Codes Button */}
+            <Button 
+              variant="outline" 
+              icon={downloading ? "spinner fa-spin" : "file-archive"} 
+              onClick={downloadAllQrCodes}
+              disabled={downloading}
+            >
+              {downloading ? 'Zipping...' : 'Download QR Codes'}
+            </Button>
+
             <Button variant="outline" icon="list" onClick={() => navigate(`/campaigns/${campaignId}/logs`)}>
               View Logs
             </Button>
@@ -448,7 +512,6 @@ export default function CampaignDetailPage() {
             </select>
           </div>
           
-          {/* 👇 Toggle to hide blank names 👇 */}
           <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer ml-2">
             <input 
               type="checkbox" 
