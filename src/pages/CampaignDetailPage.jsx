@@ -13,10 +13,13 @@ import {
 import { getTemplateById } from '../services/templateService';
 
 // ────────────────────────────────────────────────────────────────
-//  NOTE: normalizePhone has been removed. The backend stores phone
-//  numbers in their final WhatsApp-ready form, so the UI must show
-//  them exactly as they were saved.
+//  Helper to safely extract recipient name, falling back to
+//  alternative keys or phone number if the name is empty.
 // ────────────────────────────────────────────────────────────────
+const getRecipientName = (r) => {
+  if (!r) return 'Unknown';
+  return r.name || r['Attendee Name'] || r['Name'] || r['attendeeName'] || r.phone || '—';
+};
 
 const StatBadge = memo(({ label, value, color = 'gray', icon, subtitle }) => {
   const colorClasses = {
@@ -249,7 +252,7 @@ export default function CampaignDetailPage() {
     if (!campaign?.recipients?.length) { showToast('warning', 'No data', 'No recipients to export.'); return; }
     const headers = ['Attendee Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
     const rows = campaign.recipients.map(r => [
-      r.name || '',
+      getRecipientName(r),
       r.phone || '',
       r.status || '',
       r.checkedIn ? 'Yes' : 'No',
@@ -291,7 +294,7 @@ export default function CampaignDetailPage() {
   if (search) {
     const s = search.toLowerCase();
     filteredRecipients = filteredRecipients.filter(r =>
-      (r.name && r.name.toLowerCase().includes(s)) ||
+      (getRecipientName(r) && getRecipientName(r).toLowerCase().includes(s)) ||
       (r.phone && r.phone.toLowerCase().includes(s))
     );
   }
@@ -359,7 +362,7 @@ export default function CampaignDetailPage() {
               <option value="">-- Select Recipient --</option>
               {recipients.map(r => (
                 <option key={r._id || r.phone} value={r._id || r.phone}>
-                  {r.name || 'Unknown'} ({r.phone})
+                  {getRecipientName(r)} ({r.phone})
                 </option>
               ))}
             </select>
@@ -373,7 +376,7 @@ export default function CampaignDetailPage() {
               <p className="text-xs font-semibold text-gray-500 mb-2">Selected Recipient Details:</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 <span className="text-gray-500">Attendee Name:</span>
-                <span className="font-medium">{selectedManualRecipient.name || '—'}</span>
+                <span className="font-medium">{getRecipientName(selectedManualRecipient)}</span>
                 <span className="text-gray-500">Phone:</span>
                 <span className="font-medium">{selectedManualRecipient.phone}</span>
                 <span className="text-gray-500">Status:</span>
@@ -470,7 +473,7 @@ export default function CampaignDetailPage() {
                   return (
                     <tr key={r._id || idx} className="hover:bg-gray-50 transition">
                       <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
-                      <td className="px-4 py-3 font-medium">{r.name || '—'}</td>
+                      <td className="px-4 py-3 font-medium">{getRecipientName(r)}</td>
                       <td className="px-4 py-3">
                         <button
                           onClick={() => setDetailRecipient(r)}
@@ -550,7 +553,7 @@ export default function CampaignDetailPage() {
                 <div key={idx} className="bg-white rounded-lg border border-red-100 p-3 text-sm flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-700">
-                      {r.name || 'Unknown'} <span className="text-gray-400">({r.phone})</span>
+                      {getRecipientName(r)} <span className="text-gray-400">({r.phone})</span>
                     </p>
                     <p className="text-xs text-red-600 mt-0.5">Reason: {r.failureReason || 'Unknown error'}</p>
                   </div>
@@ -571,7 +574,7 @@ export default function CampaignDetailPage() {
         <Modal
           isOpen={!!messageRecipient}
           onClose={() => setMessageRecipient(null)}
-          title={`Conversation with ${messageRecipient?.name || 'Unknown'} (${messageRecipient?.phone || ''})`}
+          title={`Conversation with ${getRecipientName(messageRecipient)} (${messageRecipient?.phone || ''})`}
           size="max-w-2xl"
         >
           {messageRecipient && (
