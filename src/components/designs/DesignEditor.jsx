@@ -1410,7 +1410,7 @@ function ControlsPanel({
                     onClick={() => setSelectedOverlayIndex(idx === selectedOverlayIndex ? null : idx)}
                     className="text-xs text-orange-600 hover:text-orange-700 transition-colors"
                   >
-                    {selectedOverlayIndex === idx ? 'Hide' : 'Edit'}
+                    {selectedOverlayIndex === idx ? 'Hide' : 'Edit text'}
                   </button>
                   <button onClick={() => deleteOverlay(idx)} className="text-xs text-red-500 hover:text-red-700 transition-colors">×</button>
                 </div>
