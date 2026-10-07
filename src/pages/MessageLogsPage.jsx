@@ -6,11 +6,8 @@ import Modal from '../components/common/Modal';
 import MessageThread from '../components/campaign/MessageThread';
 
 // ─── Helpers ──────────────────────────────────────────────────
-// Strip everything that isn't a digit so +234..., 234..., 0234...
-// all normalize to the same key. Critical for matching names.
 const normalizePhone = (p) => (p || '').replace(/\D/g, '');
 
-// Safely extract a display name from a recipient object.
 const getRecipientName = (r) => {
   if (!r) return 'Unknown';
   return (
@@ -23,11 +20,12 @@ const getRecipientName = (r) => {
   );
 };
 
-// Safely extract a phone number from a recipient object.
 const getRecipientPhone = (r) => {
   if (!r) return '';
   return r.phone || r['Phone Number'] || r['phoneNumber'] || '';
 };
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 export default function MessageLogsPage() {
   const { campaignId } = useParams();
@@ -38,12 +36,14 @@ export default function MessageLogsPage() {
   const [loading, setLoading] = useState(true);
   const [directionFilter, setDirectionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-
-  // Single search box — matches name OR phone, applied client-side.
   const [search, setSearch] = useState('');
 
   // phone (normalized digits) ➔ recipient name
   const [recipientMap, setRecipientMap] = useState({});
+
+  // ─── Pagination state ────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Reply modal state
   const [replyPhone, setReplyPhone] = useState(null);
@@ -61,17 +61,14 @@ export default function MessageLogsPage() {
           if (key) map[key] = getRecipientName(r);
         });
         setRecipientMap(map);
-        // console.log('recipientMap size:', Object.keys(map).length); // debug
       } catch (err) {
         console.error('Failed to load campaign for names:', err);
-        // Silent fallback to phone numbers
       }
     };
     if (campaignId) fetchCampaignData();
   }, [campaignId]);
 
   // ─── Fetch message logs (server-side direction/status filters) ──
-  // Search is applied client-side so it can match names too.
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
@@ -110,6 +107,55 @@ export default function MessageLogsPage() {
     });
   }, [logs, search, recipientMap]);
 
+  // ─── Reset to page 1 whenever filters/search/pageSize change ──
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, directionFilter, statusFilter, pageSize]);
+
+  // ─── Pagination slice ────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+  // Guard against current page going out of range after filter narrows
+  const safePage = Math.min(currentPage, totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const paginatedLogs = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, safePage, pageSize]);
+
+  const rangeStart = filteredLogs.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(safePage * pageSize, filteredLogs.length);
+
+  // ─── Page-number buttons (windowed when many pages) ──────
+  const pageNumbers = useMemo(() => {
+    const total = totalPages;
+    const current = safePage;
+    const windowSize = 5;
+
+    if (total <= windowSize + 2) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+
+    const pages = new Set([1, total, current]);
+    for (let i = 1; i <= 2; i++) {
+      if (current - i > 1) pages.add(current - i);
+      if (current + i < total) pages.add(current + i);
+    }
+
+    const sorted = [...pages].sort((a, b) => a - b);
+    const withEllipsis = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
+        withEllipsis.push('…');
+      }
+      withEllipsis.push(sorted[i]);
+    }
+    return withEllipsis;
+  }, [safePage, totalPages]);
+
   // ─── UI helpers ─────────────────────────────────────────────
   const statusBadge = (status) => {
     const colors = {
@@ -138,6 +184,12 @@ export default function MessageLogsPage() {
   const closeReplyModal = () => {
     setShowReplyModal(false);
     setReplyPhone(null);
+  };
+
+  const goToPage = (p) => {
+    if (typeof p !== 'number') return;
+    if (p < 1 || p > totalPages) return;
+    setCurrentPage(p);
   };
 
   return (
@@ -189,6 +241,18 @@ export default function MessageLogsPage() {
           <option value="failed">Failed</option>
           <option value="pending">Pending</option>
         </select>
+        <select
+          value={pageSize}
+          onChange={(e) => setPageSize(Number(e.target.value))}
+          className="border rounded-lg px-3 py-2 text-sm ml-auto"
+          title="Rows per page"
+        >
+          {PAGE_SIZE_OPTIONS.map((n) => (
+            <option key={n} value={n}>
+              {n} / page
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading && logs.length === 0 ? (
@@ -196,103 +260,175 @@ export default function MessageLogsPage() {
           <i className="fas fa-spinner fa-pulse text-2xl text-gray-400"></i>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left">Recipient</th>
-                <th className="px-4 py-3 text-left">Direction</th>
-                <th className="px-4 py-3 text-left">Body</th>
-                <th className="px-4 py-3 text-left">Media</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Sent At</th>
-                <th className="px-4 py-3 text-left">Updated At</th>
-                <th className="px-4 py-3 text-left">Failure Reasons</th>
-                <th className="px-4 py-3 text-left">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {filteredLogs.length === 0 ? (
+        <>
+          <div className="bg-white rounded-xl shadow overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td
-                    colSpan="9"
-                    className="px-4 py-6 text-center text-gray-400"
-                  >
-                    {logs.length === 0
-                      ? 'No logs found'
-                      : 'No logs match your search'}
-                  </td>
+                  <th className="px-4 py-3 text-left">Recipient</th>
+                  <th className="px-4 py-3 text-left">Direction</th>
+                  <th className="px-4 py-3 text-left">Body</th>
+                  <th className="px-4 py-3 text-left">Media</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Sent At</th>
+                  <th className="px-4 py-3 text-left">Updated At</th>
+                  <th className="px-4 py-3 text-left">Failure Reasons</th>
+                  <th className="px-4 py-3 text-left">Action</th>
                 </tr>
-              ) : (
-                filteredLogs.map((log) => (
-                  <tr key={log._id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-800">
-                        {recipientMap[normalizePhone(log.phone)] ||
-                          'Unknown Recipient'}
-                      </div>
-                      <div className="text-xs text-gray-500 font-mono">
-                        {log.phone}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${
-                          log.direction === 'incoming'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-green-100 text-green-700'
-                        }`}
-                      >
-                        {log.direction}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{log.body || '—'}</td>
-                    <td className="px-4 py-3">
-                      {log.mediaUrl ? (
-                        <img
-                          src={log.mediaUrl}
-                          alt="media"
-                          className="w-10 h-10 object-cover rounded"
-                        />
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-4 py-3">{statusBadge(log.status)}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
-                      {formatTime(log.timestamp)}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
-                      {log.updatedAt ? formatTime(log.updatedAt) : '—'}
-                      {log.status === 'failed' &&
-                        log.createdAt !== log.updatedAt && (
-                          <span
-                            className="ml-1 text-red-500"
-                            title="Originally accepted, later failed"
-                          >
-                            <i className="fas fa-exclamation-circle"></i>
-                          </span>
-                        )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-red-600">
-                      {log.failureReason || '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {log.direction === 'incoming' && (
-                        <button
-                          onClick={() => openReplyModal(log.phone)}
-                          className="text-blue-600 hover:underline text-xs"
-                        >
-                          Reply
-                        </button>
-                      )}
+              </thead>
+              <tbody className="divide-y">
+                {paginatedLogs.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="9"
+                      className="px-4 py-6 text-center text-gray-400"
+                    >
+                      {logs.length === 0
+                        ? 'No logs found'
+                        : 'No logs match your search'}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  paginatedLogs.map((log) => (
+                    <tr key={log._id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-800">
+                          {recipientMap[normalizePhone(log.phone)] ||
+                            'Unknown Recipient'}
+                        </div>
+                        <div className="text-xs text-gray-500 font-mono">
+                          {log.phone}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs ${
+                            log.direction === 'incoming'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}
+                        >
+                          {log.direction}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{log.body || '—'}</td>
+                      <td className="px-4 py-3">
+                        {log.mediaUrl ? (
+                          <img
+                            src={log.mediaUrl}
+                            alt="media"
+                            className="w-10 h-10 object-cover rounded"
+                          />
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-3">{statusBadge(log.status)}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {formatTime(log.timestamp)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {log.updatedAt ? formatTime(log.updatedAt) : '—'}
+                        {log.status === 'failed' &&
+                          log.createdAt !== log.updatedAt && (
+                            <span
+                              className="ml-1 text-red-500"
+                              title="Originally accepted, later failed"
+                            >
+                              <i className="fas fa-exclamation-circle"></i>
+                            </span>
+                          )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-red-600">
+                        {log.failureReason || '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        {log.direction === 'incoming' && (
+                          <button
+                            onClick={() => openReplyModal(log.phone)}
+                            className="text-blue-600 hover:underline text-xs"
+                          >
+                            Reply
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ─── Pagination controls ─────────────────────────── */}
+          {filteredLogs.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+              <div className="text-xs text-gray-500">
+                Showing <span className="font-semibold">{rangeStart}</span>–
+                <span className="font-semibold">{rangeEnd}</span> of{' '}
+                <span className="font-semibold">{filteredLogs.length}</span>
+                {filteredLogs.length !== logs.length && (
+                  <span className="text-gray-400"> (filtered from {logs.length})</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => goToPage(1)}
+                  disabled={safePage === 1}
+                  className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="First page"
+                >
+                  <i className="fas fa-angle-double-left"></i>
+                </button>
+                <button
+                  onClick={() => goToPage(safePage - 1)}
+                  disabled={safePage === 1}
+                  className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Previous page"
+                >
+                  <i className="fas fa-angle-left"></i>
+                </button>
+
+                {pageNumbers.map((p, i) =>
+                  p === '…' ? (
+                    <span key={`e-${i}`} className="px-2 text-xs text-gray-400">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => goToPage(p)}
+                      className={`px-2.5 py-1 text-xs border rounded transition-colors ${
+                        p === safePage
+                          ? 'bg-orange-500 text-white border-orange-500'
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+
+                <button
+                  onClick={() => goToPage(safePage + 1)}
+                  disabled={safePage === totalPages}
+                  className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Next page"
+                >
+                  <i className="fas fa-angle-right"></i>
+                </button>
+                <button
+                  onClick={() => goToPage(totalPages)}
+                  disabled={safePage === totalPages}
+                  className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Last page"
+                >
+                  <i className="fas fa-angle-double-right"></i>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Reply Modal */}
@@ -312,4 +448,4 @@ export default function MessageLogsPage() {
       </Modal>
     </div>
   );
-} 
+}
