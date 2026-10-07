@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import JSZip from 'jszip'; // 👈 Import JSZip
+import JSZip from 'jszip';
 import { useToast } from '../components/layout/Toast';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
 import MessageThread from '../components/campaign/MessageThread';
+import PreviewPanel from '../components/campaign/PreviewPanel';
 import {
   getCampaignById,
   retryFailedMessages,
@@ -88,19 +89,24 @@ export default function CampaignDetailPage() {
   const [retrying, setRetrying] = useState(false);
   const [resettingId, setResettingId] = useState(null);
   const [hideNameless, setHideNameless] = useState(true);
-  
-  // 👇 NEW: State to track ZIP download progress
+
   const [downloading, setDownloading] = useState(false);
 
   const [selectedRecipientId, setSelectedRecipientId] = useState('');
   const [detailRecipient, setDetailRecipient] = useState(null);
   const [messageRecipient, setMessageRecipient] = useState(null);
 
+  // ─── NEW: Preview state ────────────────────────────────────
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [previewVariantPos, setPreviewVariantPos] = useState(0);
+  const [previewIncludeHeader, setPreviewIncludeHeader] = useState(true);
+
   const baselineMessageIdsRef = useRef(new Set());
   const openedThreadPhonesRef = useRef(new Set());
   const [newMessagePhones, setNewMessagePhones] = useState(new Set());
 
-  const isModalOpen = !!messageRecipient || !!detailRecipient;
+  const isModalOpen = !!messageRecipient || !!detailRecipient || showPreviewModal;
 
   const fetchCampaign = useCallback(async () => {
     try {
@@ -207,18 +213,16 @@ export default function CampaignDetailPage() {
     }
   };
 
-  const openWhatsAppForRecipient = (phone, recipientData = null) => {
-    const normalizedPhone = String(phone || '').replace(/^\+/, '');
-
+  // ─── Message body builder (used by both "Send via WhatsApp" and preview) ──
+  const buildMessageForRecipient = (recipientData, variantIdx = 0) => {
     let messageBody = '';
     if (template && template.variants && template.variants.length > 0) {
-      const activeIndex = (campaign.activeVariants && campaign.activeVariants[0]) || 0;
-      const variant = template.variants[activeIndex] || template.variants[0];
+      const variant = template.variants[variantIdx] || template.variants[0];
       messageBody = variant.body || '';
     }
 
     if (recipientData) {
-      const mapping = campaign.mapping || {};
+      const mapping = campaign?.mapping || {};
       messageBody = messageBody.replace(/\{\{(\d+)\}\}/g, (match, num) => {
         const columnName = mapping[num] || mapping[String(num)];
         if (columnName && recipientData[columnName] !== undefined) {
@@ -228,14 +232,31 @@ export default function CampaignDetailPage() {
       });
     }
 
-    let finalMessage = '';
-    const imageUrl = recipientData?.qrUrl || campaign.headerImageUrl || '';
-    if (imageUrl && campaign.includeHeaderImage) {
-      finalMessage = `${imageUrl}\n\n${messageBody}`;
-    } else {
-      finalMessage = messageBody;
-    }
+    return messageBody;
+  };
 
+  // Raw text version (for wa.me link)
+  const buildRawMessageForRecipient = (recipientData, variantIdx = 0) => {
+    const body = buildMessageForRecipient(recipientData, variantIdx);
+    const imageUrl = recipientData?.qrUrl || campaign?.headerImageUrl || '';
+    if (imageUrl && campaign?.includeHeaderImage) {
+      return `${imageUrl}\n\n${body}`;
+    }
+    return body;
+  };
+
+  // HTML version (for preview panel)
+  const buildHtmlMessageForRecipient = (recipientData, variantIdx = 0) => {
+    let body = buildMessageForRecipient(recipientData, variantIdx);
+    body = body.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+    body = body.replace(/\n/g, '<br>');
+    return body;
+  };
+
+  const openWhatsAppForRecipient = (phone, recipientData = null) => {
+    const normalizedPhone = String(phone || '').replace(/^\+/, '');
+    const activeIndex = (campaign?.activeVariants && campaign.activeVariants[0]) || 0;
+    const finalMessage = buildRawMessageForRecipient(recipientData, activeIndex);
     const encodedMessage = encodeURIComponent(finalMessage);
     window.open(`https://wa.me/${normalizedPhone}?text=${encodedMessage}`, '_blank');
   };
@@ -251,10 +272,59 @@ export default function CampaignDetailPage() {
     if (recipient) openWhatsAppForRecipient(getRecipientPhone(recipient), recipient);
   };
 
-  // 👇 NEW: Function to download all QR codes as a ZIP
+  // ─── NEW: Preview helpers ──────────────────────────────────
+  const recipients = campaign?.recipients || [];
+
+  // Which variant indices can be previewed (active ones if defined, else all)
+  const previewableVariantIndices = useMemo(() => {
+    const all = template?.variants || [];
+    if (all.length === 0) return [];
+    const active = campaign?.activeVariants || [];
+    if (active.length === 0) return all.map((_, i) => i);
+    const valid = active.filter(i => Number.isInteger(i) && i >= 0 && i < all.length);
+    return valid.length > 0 ? valid : all.map((_, i) => i);
+  }, [template, campaign]);
+
+  const previewVariantIdx = previewableVariantIndices[previewVariantPos] ?? 0;
+  const previewRecipient = recipients[previewIndex] || null;
+  const previewVariantLabel =
+    template?.variants?.[previewVariantIdx]?.label || `V${previewVariantIdx + 1}`;
+
+  const openPreviewForRecipient = (recipient) => {
+    const idx = recipients.indexOf(recipient);
+    if (idx < 0) return;
+    setPreviewIndex(idx);
+    // Start on the campaign's first active variant if defined
+    const active = campaign?.activeVariants || [];
+    const startPos = active.length > 0
+      ? Math.max(0, previewableVariantIndices.indexOf(active[0]))
+      : 0;
+    setPreviewVariantPos(startPos >= 0 ? startPos : 0);
+    setPreviewIncludeHeader(!!campaign?.includeHeaderImage);
+    setShowPreviewModal(true);
+  };
+
+  const previewPrevRecipient = () => {
+    if (recipients.length === 0) return;
+    setPreviewIndex(i => (i - 1 + recipients.length) % recipients.length);
+  };
+  const previewNextRecipient = () => {
+    if (recipients.length === 0) return;
+    setPreviewIndex(i => (i + 1) % recipients.length);
+  };
+  const previewCycleVariant = (direction) => {
+    if (previewableVariantIndices.length === 0) return;
+    setPreviewVariantPos(pos => {
+      const next = pos + direction;
+      if (next < 0) return previewableVariantIndices.length - 1;
+      if (next >= previewableVariantIndices.length) return 0;
+      return next;
+    });
+  };
+
   const downloadAllQrCodes = async () => {
     const recipientsWithQr = (campaign?.recipients || []).filter(r => r.qrUrl);
-    
+
     if (recipientsWithQr.length === 0) {
       showToast('info', 'No QR Codes', 'No recipients in this campaign have QR codes to download.');
       return;
@@ -267,26 +337,21 @@ export default function CampaignDetailPage() {
     const folder = zip.folder(`campaign_${campaignId}_qrcodes`);
 
     try {
-      // Fetch all images concurrently
       await Promise.all(recipientsWithQr.map(async (r, index) => {
         try {
           const response = await fetch(r.qrUrl);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
-          
-          // Create a safe filename using the recipient's name or phone number
+
           const rawName = getRecipientName(r) || getRecipientPhone(r) || `recipient_${index}`;
           const safeName = String(rawName).replace(/[^a-z0-9]/gi, '_').substring(0, 50);
-          
-          // Add the image to the ZIP folder
+
           folder.file(`QR_${safeName}_${getRecipientPhone(r)}.png`, blob);
         } catch (err) {
           console.error(`Failed to fetch QR for ${getRecipientPhone(r)}:`, err);
-          // We continue even if one image fails
         }
       }));
 
-      // Generate the ZIP file and trigger download
       const content = await zip.generateAsync({ type: 'blob' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
@@ -337,7 +402,6 @@ export default function CampaignDetailPage() {
     return <div className="flex-1 flex items-center justify-center text-gray-500">Campaign not found.</div>;
   }
 
-  const recipients = campaign.recipients || [];
   const total = recipients.length;
   const sent = recipients.filter(r => r.status === 'sent').length;
   const failed = recipients.filter(r => r.status === 'failed').length;
@@ -346,7 +410,7 @@ export default function CampaignDetailPage() {
   const deliveryRate = total > 0 ? Math.round((sent / total) * 100) : 0;
 
   let filteredRecipients = recipients;
-  
+
   if (hideNameless) {
     filteredRecipients = filteredRecipients.filter(r => {
       const name = r.name || r['Attendee Name'] || r['Name'] || r['attendeeName'];
@@ -401,11 +465,10 @@ export default function CampaignDetailPage() {
               Add Recipients
             </Button>
             <Button variant="outline" onClick={exportCSV} icon="download">Export CSV</Button>
-            
-            {/* 👇 NEW: Download QR Codes Button */}
-            <Button 
-              variant="outline" 
-              icon={downloading ? "spinner fa-spin" : "file-archive"} 
+
+            <Button
+              variant="outline"
+              icon={downloading ? "spinner fa-spin" : "file-archive"}
               onClick={downloadAllQrCodes}
               disabled={downloading}
             >
@@ -467,6 +530,14 @@ export default function CampaignDetailPage() {
                   </>
                 )}
               </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={() => openPreviewForRecipient(selectedManualRecipient)}
+                  className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition"
+                >
+                  <i className="fas fa-eye mr-1"></i> Preview Message
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -511,11 +582,11 @@ export default function CampaignDetailPage() {
               <option value="pending">Pending</option>
             </select>
           </div>
-          
+
           <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer ml-2">
-            <input 
-              type="checkbox" 
-              checked={hideNameless} 
+            <input
+              type="checkbox"
+              checked={hideNameless}
               onChange={(e) => setHideNameless(e.target.checked)}
               className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
             />
@@ -582,6 +653,14 @@ export default function CampaignDetailPage() {
                       <td className="px-4 py-3">{checkInBadge(r.checkedIn)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
+                          {/* 👇 NEW: Preview button */}
+                          <button
+                            onClick={() => openPreviewForRecipient(r)}
+                            className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg hover:bg-indigo-200 transition"
+                            title="Preview what this recipient will receive"
+                          >
+                            <i className="fas fa-eye mr-1"></i> Preview
+                          </button>
                           <button
                             onClick={() => openWhatsAppForRecipient(getRecipientPhone(r), r)}
                             className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition"
@@ -669,6 +748,59 @@ export default function CampaignDetailPage() {
               phone={getRecipientPhone(messageRecipient)}
               showHeader={false}
             />
+          )}
+        </Modal>
+
+        {/* 👇 NEW: Preview Modal — reuses the builder's PreviewPanel */}
+        <Modal
+          isOpen={showPreviewModal}
+          onClose={() => setShowPreviewModal(false)}
+          title="Message Preview"
+          size="max-w-md"
+        >
+          {template && previewRecipient ? (
+            <div className="space-y-3">
+              <div className="text-xs text-gray-500 -mt-1">
+                This is exactly what <span className="font-semibold text-gray-700">{getRecipientName(previewRecipient)}</span> would receive.
+                Use the arrows to flip through recipients and variants.
+              </div>
+
+              <PreviewPanel
+                recipientData={{
+                  name: previewRecipient[campaign.mapping?.['1']] || getRecipientName(previewRecipient),
+                  phone: getRecipientPhone(previewRecipient),
+                }}
+                messageText={buildHtmlMessageForRecipient(previewRecipient, previewVariantIdx)}
+                qrUrl={previewRecipient.qrUrl || ''}
+                showQR={
+                  template?.showQR !== false &&
+                  !!previewRecipient.qrUrl
+                }
+                currentIndex={previewIndex + 1}
+                total={recipients.length}
+                onPrev={previewPrevRecipient}
+                onNext={previewNextRecipient}
+                variantLabel={previewVariantLabel}
+                onCycleVariant={previewCycleVariant}
+                buttonType={template?.buttonType || 'none'}
+                buttonText={template?.buttonText || ''}
+                buttonValue={template?.buttonValue || ''}
+                headerImageUrl={previewIncludeHeader ? (campaign.headerImageUrl || '') : ''}
+                includeHeaderImage={previewIncludeHeader}
+                setIncludeHeaderImage={setPreviewIncludeHeader}
+                quickReplies={template?.quickReplies || []}
+              />
+
+              <div className="flex justify-end pt-2 border-t border-gray-100">
+                <Button variant="outline" onClick={() => setShowPreviewModal(false)}>Close</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-6 text-center text-sm text-gray-500">
+              {!template
+                ? 'Template not loaded for this campaign.'
+                : 'No recipients available to preview.'}
+            </div>
           )}
         </Modal>
       </div>
