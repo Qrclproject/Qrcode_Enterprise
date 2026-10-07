@@ -806,4 +806,4 @@ export default function CampaignDetailPage() {
       </div>
     </div>
   );
-}
+} 
