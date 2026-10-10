@@ -18,7 +18,7 @@ import {
   resolveMappingColumn,
   getRecipientDisplayName,
   getRecipientDisplayPhone,
-} from '../utils/formatters';
+} from '../utils/formatters'; 
 
 // ────────────────────────────────────────────────────────────────
 //  Helpers — case/whitespace tolerant, mapping-aware
