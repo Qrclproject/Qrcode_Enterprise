@@ -13,19 +13,18 @@ import {
   getCampaignMessages,
 } from '../services/campaignService';
 import { getTemplateById } from '../services/templateService';
+import {
+  getRecipientValue,
+  resolveMappingColumn,
+  getRecipientDisplayName,
+  getRecipientDisplayPhone,
+} from '../utils/formatters';
 
 // ────────────────────────────────────────────────────────────────
-//  Helpers to safely extract recipient data
+//  Helpers — case/whitespace tolerant, mapping-aware
 // ────────────────────────────────────────────────────────────────
-const getRecipientName = (r) => {
-  if (!r) return 'Unknown';
-  return r.name || r['Attendee Name'] || r['Name'] || r['attendeeName'] || getRecipientPhone(r) || '—';
-};
-
-const getRecipientPhone = (r) => {
-  if (!r) return '';
-  return r.phone || r['Phone Number'] || r['phoneNumber'] || '';
-};
+const getRecipientName = (r, mapping) => getRecipientDisplayName(r, mapping);
+const getRecipientPhone = (r, mapping) => getRecipientDisplayPhone(r, mapping);
 
 const StatBadge = memo(({ label, value, color = 'gray', icon, subtitle }) => {
   const colorClasses = {
@@ -96,7 +95,7 @@ export default function CampaignDetailPage() {
   const [detailRecipient, setDetailRecipient] = useState(null);
   const [messageRecipient, setMessageRecipient] = useState(null);
 
-  // ─── NEW: Preview state ────────────────────────────────────
+  // ─── Preview state ────────────────────────────────────────
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [previewVariantPos, setPreviewVariantPos] = useState(0);
@@ -171,7 +170,7 @@ export default function CampaignDetailPage() {
   }, [campaignId, fetchNewMessages]);
 
   const handleOpenMessages = (recipient) => {
-    const phone = getRecipientPhone(recipient);
+    const phone = getRecipientPhone(recipient, campaign?.mapping);
     setMessageRecipient(recipient);
     setNewMessagePhones(prev => {
       const next = new Set(prev);
@@ -198,7 +197,7 @@ export default function CampaignDetailPage() {
   };
 
   const handleResetCheckIn = async (recipient) => {
-    const identifier = recipient._id || getRecipientPhone(recipient);
+    const identifier = recipient._id || getRecipientPhone(recipient, campaign?.mapping);
     if (!identifier) { showToast('error', 'Invalid recipient', 'Cannot identify recipient.'); return; }
     if (!window.confirm('Reactivate this QR code? The attendee will be able to scan again.')) return;
     setResettingId(identifier);
@@ -213,7 +212,7 @@ export default function CampaignDetailPage() {
     }
   };
 
-  // ─── Message body builder (used by both "Send via WhatsApp" and preview) ──
+  // ─── Message body builder — case-insensitive placeholder resolution ──
   const buildMessageForRecipient = (recipientData, variantIdx = 0) => {
     let messageBody = '';
     if (template && template.variants && template.variants.length > 0) {
@@ -224,9 +223,10 @@ export default function CampaignDetailPage() {
     if (recipientData) {
       const mapping = campaign?.mapping || {};
       messageBody = messageBody.replace(/\{\{(\d+)\}\}/g, (match, num) => {
-        const columnName = mapping[num] || mapping[String(num)];
-        if (columnName && recipientData[columnName] !== undefined) {
-          return recipientData[columnName] || '';
+        const columnName = resolveMappingColumn(mapping, num);
+        if (columnName) {
+          const value = getRecipientValue(recipientData, columnName);
+          if (value) return value;
         }
         return match;
       });
@@ -235,7 +235,6 @@ export default function CampaignDetailPage() {
     return messageBody;
   };
 
-  // Raw text version (for wa.me link)
   const buildRawMessageForRecipient = (recipientData, variantIdx = 0) => {
     const body = buildMessageForRecipient(recipientData, variantIdx);
     const imageUrl = recipientData?.qrUrl || campaign?.headerImageUrl || '';
@@ -245,7 +244,6 @@ export default function CampaignDetailPage() {
     return body;
   };
 
-  // HTML version (for preview panel)
   const buildHtmlMessageForRecipient = (recipientData, variantIdx = 0) => {
     let body = buildMessageForRecipient(recipientData, variantIdx);
     body = body.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
@@ -267,15 +265,14 @@ export default function CampaignDetailPage() {
       return;
     }
     const recipient = campaign.recipients?.find(
-      r => (r._id || getRecipientPhone(r)) === selectedRecipientId
+      r => (r._id || getRecipientPhone(r, campaign?.mapping)) === selectedRecipientId
     );
-    if (recipient) openWhatsAppForRecipient(getRecipientPhone(recipient), recipient);
+    if (recipient) openWhatsAppForRecipient(getRecipientPhone(recipient, campaign?.mapping), recipient);
   };
 
-  // ─── NEW: Preview helpers ──────────────────────────────────
+  // ─── Preview helpers ───────────────────────────────────────
   const recipients = campaign?.recipients || [];
 
-  // Which variant indices can be previewed (active ones if defined, else all)
   const previewableVariantIndices = useMemo(() => {
     const all = template?.variants || [];
     if (all.length === 0) return [];
@@ -294,7 +291,6 @@ export default function CampaignDetailPage() {
     const idx = recipients.indexOf(recipient);
     if (idx < 0) return;
     setPreviewIndex(idx);
-    // Start on the campaign's first active variant if defined
     const active = campaign?.activeVariants || [];
     const startPos = active.length > 0
       ? Math.max(0, previewableVariantIndices.indexOf(active[0]))
@@ -343,12 +339,12 @@ export default function CampaignDetailPage() {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
 
-          const rawName = getRecipientName(r) || getRecipientPhone(r) || `recipient_${index}`;
+          const rawName = getRecipientName(r, campaign?.mapping) || getRecipientPhone(r, campaign?.mapping) || `recipient_${index}`;
           const safeName = String(rawName).replace(/[^a-z0-9]/gi, '_').substring(0, 50);
 
-          folder.file(`QR_${safeName}_${getRecipientPhone(r)}.png`, blob);
+          folder.file(`QR_${safeName}_${getRecipientPhone(r, campaign?.mapping)}.png`, blob);
         } catch (err) {
-          console.error(`Failed to fetch QR for ${getRecipientPhone(r)}:`, err);
+          console.error(`Failed to fetch QR for ${getRecipientPhone(r, campaign?.mapping)}:`, err);
         }
       }));
 
@@ -373,8 +369,8 @@ export default function CampaignDetailPage() {
     if (!campaign?.recipients?.length) { showToast('warning', 'No data', 'No recipients to export.'); return; }
     const headers = ['Attendee Name', 'Phone', 'Status', 'Checked In', 'QR URL'];
     const rows = campaign.recipients.map(r => [
-      getRecipientName(r),
-      getRecipientPhone(r),
+      getRecipientName(r, campaign?.mapping),
+      getRecipientPhone(r, campaign?.mapping),
       r.status || '',
       r.checkedIn ? 'Yes' : 'No',
       r.qrUrl || ''
@@ -413,18 +409,19 @@ export default function CampaignDetailPage() {
 
   if (hideNameless) {
     filteredRecipients = filteredRecipients.filter(r => {
-      const name = r.name || r['Attendee Name'] || r['Name'] || r['attendeeName'];
-      return name && String(name).trim() !== '';
+      const name = getRecipientName(r, campaign?.mapping);
+      return name && name !== '—' && name !== 'Unknown';
     });
   }
 
   if (statusFilter !== 'all') filteredRecipients = filteredRecipients.filter(r => r.status === statusFilter);
   if (search) {
     const s = search.toLowerCase();
-    filteredRecipients = filteredRecipients.filter(r =>
-      (getRecipientName(r) && getRecipientName(r).toLowerCase().includes(s)) ||
-      (getRecipientPhone(r) && getRecipientPhone(r).toLowerCase().includes(s))
-    );
+    filteredRecipients = filteredRecipients.filter(r => {
+      const name = (getRecipientName(r, campaign?.mapping) || '').toLowerCase();
+      const phone = (getRecipientPhone(r, campaign?.mapping) || '').toLowerCase();
+      return name.includes(s) || phone.includes(s);
+    });
   }
 
   const failedRecipients = recipients.filter(r => r.status === 'failed');
@@ -442,7 +439,9 @@ export default function CampaignDetailPage() {
     ? <span className="text-xs text-green-600"><i className="fas fa-check-circle"></i> Checked In</span>
     : <span className="text-xs text-gray-400"><i className="fas fa-circle"></i> Not checked</span>;
 
-  const selectedManualRecipient = recipients.find(r => (r._id || getRecipientPhone(r)) === selectedRecipientId);
+  const selectedManualRecipient = recipients.find(r =>
+    (r._id || getRecipientPhone(r, campaign?.mapping)) === selectedRecipientId
+  );
 
   return (
     <div className="flex-1 overflow-y-auto p-5 bg-gradient-to-br from-gray-50 via-white to-orange-50/30">
@@ -499,8 +498,8 @@ export default function CampaignDetailPage() {
             >
               <option value="">-- Select Recipient --</option>
               {recipients.map(r => (
-                <option key={r._id || getRecipientPhone(r)} value={r._id || getRecipientPhone(r)}>
-                  {getRecipientName(r)} ({getRecipientPhone(r)})
+                <option key={r._id || getRecipientPhone(r, campaign?.mapping)} value={r._id || getRecipientPhone(r, campaign?.mapping)}>
+                  {getRecipientName(r, campaign?.mapping)} ({getRecipientPhone(r, campaign?.mapping)})
                 </option>
               ))}
             </select>
@@ -514,9 +513,9 @@ export default function CampaignDetailPage() {
               <p className="text-xs font-semibold text-gray-500 mb-2">Selected Recipient Details:</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 <span className="text-gray-500">Attendee Name:</span>
-                <span className="font-medium">{getRecipientName(selectedManualRecipient)}</span>
+                <span className="font-medium">{getRecipientName(selectedManualRecipient, campaign?.mapping)}</span>
                 <span className="text-gray-500">Phone:</span>
-                <span className="font-medium">{getRecipientPhone(selectedManualRecipient)}</span>
+                <span className="font-medium">{getRecipientPhone(selectedManualRecipient, campaign?.mapping)}</span>
                 <span className="text-gray-500">Status:</span>
                 <span>{statusBadge(selectedManualRecipient.status)}</span>
                 <span className="text-gray-500">Check‑In:</span>
@@ -626,18 +625,18 @@ export default function CampaignDetailPage() {
                 </tr>
               ) : (
                 filteredRecipients.map((r, idx) => {
-                  const hasNew = newMessagePhones.has(getRecipientPhone(r));
+                  const hasNew = newMessagePhones.has(getRecipientPhone(r, campaign?.mapping));
                   return (
                     <tr key={r._id || idx} className="hover:bg-gray-50 transition">
                       <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
-                      <td className="px-4 py-3 font-medium">{getRecipientName(r)}</td>
+                      <td className="px-4 py-3 font-medium">{getRecipientName(r, campaign?.mapping)}</td>
                       <td className="px-4 py-3">
                         <button
                           onClick={() => setDetailRecipient(r)}
                           className="font-mono text-xs text-blue-600 hover:text-blue-800 underline-offset-2 hover:underline"
                           title="View details"
                         >
-                          {getRecipientPhone(r)}
+                          {getRecipientPhone(r, campaign?.mapping)}
                         </button>
                       </td>
                       <td className="px-4 py-3">{statusBadge(r.status)}</td>
@@ -653,7 +652,6 @@ export default function CampaignDetailPage() {
                       <td className="px-4 py-3">{checkInBadge(r.checkedIn)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
-                          {/* 👇 NEW: Preview button */}
                           <button
                             onClick={() => openPreviewForRecipient(r)}
                             className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg hover:bg-indigo-200 transition"
@@ -662,7 +660,7 @@ export default function CampaignDetailPage() {
                             <i className="fas fa-eye mr-1"></i> Preview
                           </button>
                           <button
-                            onClick={() => openWhatsAppForRecipient(getRecipientPhone(r), r)}
+                            onClick={() => openWhatsAppForRecipient(getRecipientPhone(r, campaign?.mapping), r)}
                             className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-lg hover:bg-green-200 transition"
                             title="Send message via WhatsApp"
                           >
@@ -681,10 +679,10 @@ export default function CampaignDetailPage() {
                           {r.checkedIn && (
                             <button
                               onClick={() => handleResetCheckIn(r)}
-                              disabled={resettingId === (r._id || getRecipientPhone(r))}
+                              disabled={resettingId === (r._id || getRecipientPhone(r, campaign?.mapping))}
                               className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-lg hover:bg-orange-200 transition disabled:opacity-50"
                             >
-                              {resettingId === (r._id || getRecipientPhone(r)) ? (
+                              {resettingId === (r._id || getRecipientPhone(r, campaign?.mapping)) ? (
                                 <><i className="fas fa-spinner fa-spin mr-1"></i>Resetting...</>
                               ) : (
                                 <><i className="fas fa-undo-alt mr-1"></i>Reset</>
@@ -718,7 +716,7 @@ export default function CampaignDetailPage() {
                 <div key={idx} className="bg-white rounded-lg border border-red-100 p-3 text-sm flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-700">
-                      {getRecipientName(r)} <span className="text-gray-400">({getRecipientPhone(r)})</span>
+                      {getRecipientName(r, campaign?.mapping)} <span className="text-gray-400">({getRecipientPhone(r, campaign?.mapping)})</span>
                     </p>
                     <p className="text-xs text-red-600 mt-0.5">Reason: {r.failureReason || 'Unknown error'}</p>
                   </div>
@@ -739,19 +737,19 @@ export default function CampaignDetailPage() {
         <Modal
           isOpen={!!messageRecipient}
           onClose={() => setMessageRecipient(null)}
-          title={`Conversation with ${getRecipientName(messageRecipient)} (${getRecipientPhone(messageRecipient)})`}
+          title={`Conversation with ${getRecipientName(messageRecipient, campaign?.mapping)} (${getRecipientPhone(messageRecipient, campaign?.mapping)})`}
           size="max-w-2xl"
         >
           {messageRecipient && (
             <MessageThread
               campaignId={campaignId}
-              phone={getRecipientPhone(messageRecipient)}
+              phone={getRecipientPhone(messageRecipient, campaign?.mapping)}
               showHeader={false}
             />
           )}
         </Modal>
 
-        {/* 👇 NEW: Preview Modal — reuses the builder's PreviewPanel */}
+        {/* Preview Modal */}
         <Modal
           isOpen={showPreviewModal}
           onClose={() => setShowPreviewModal(false)}
@@ -761,14 +759,14 @@ export default function CampaignDetailPage() {
           {template && previewRecipient ? (
             <div className="space-y-3">
               <div className="text-xs text-gray-500 -mt-1">
-                This is exactly what <span className="font-semibold text-gray-700">{getRecipientName(previewRecipient)}</span> would receive.
+                This is exactly what <span className="font-semibold text-gray-700">{getRecipientName(previewRecipient, campaign?.mapping)}</span> would receive.
                 Use the arrows to flip through recipients and variants.
               </div>
 
               <PreviewPanel
                 recipientData={{
-                  name: previewRecipient[campaign.mapping?.['1']] || getRecipientName(previewRecipient),
-                  phone: getRecipientPhone(previewRecipient),
+                  name: getRecipientName(previewRecipient, campaign?.mapping),
+                  phone: getRecipientPhone(previewRecipient, campaign?.mapping),
                 }}
                 messageText={buildHtmlMessageForRecipient(previewRecipient, previewVariantIdx)}
                 qrUrl={previewRecipient.qrUrl || ''}
@@ -806,4 +804,4 @@ export default function CampaignDetailPage() {
       </div>
     </div>
   );
-} 
+}
